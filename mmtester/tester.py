@@ -45,6 +45,7 @@ import glob
 import json
 import time
 import configparser
+import shutil
 from typing import List, Dict, Union
 import queue
 from threading import Thread
@@ -209,7 +210,7 @@ def show_summary(runs: Dict[str, Dict[int, float]], tests: Union[None, List[int]
     print(tabulate.tabulate(table, headers=headers))
         
 
-if __name__ == '__main__':
+def _main():
     parser = argparse.ArgumentParser(description='Tester for Marathon Matches')
     parser.add_argument('name', type=str, nargs='?', default=None, help='name of the run') 
     parser.add_argument('-c', '--config', type=str, default=DEFAULT_CONFIG_PATH, help='path to cfg file')
@@ -220,6 +221,7 @@ if __name__ == '__main__':
     parser.add_argument('-a', '--tester_arguments', type=str, default='', help='additional arguments for the tester')
     parser.add_argument('-b', '--benchmark', type=str, default=None, help='benchmark res file to test against')
     parser.add_argument('-s', '--show', action='store_true', help='shows current results') 
+    parser.add_argument('--new', action='store_true', help='creates a new config in the current directory')
     parser.add_argument('--data', type=str, default=None, help='file with metadata, used for grouping and filtering; in order to always use latest results file set it to LATEST') 
     parser.add_argument('--filters', type=str, default=None, nargs='+', help='filters results based on criteria') 
     parser.add_argument('--groups', type=str, default=None, nargs='+', help='groups results into different groups based on criteria') 
@@ -230,8 +232,13 @@ if __name__ == '__main__':
     
     args = parser.parse_args()
     
+    if args.new:
+        print(f'Creating new config file at {args.config}')
+        shutil.copy(os.path.join(os.path.dirname(__file__), 'tester.cfg'), os.getcwd())
+        sys.exit(0)
+    
     if not os.path.exists(args.config):
-        print(f'Fatal Error: Cannot locate config file at {args.config}. Check XXX for more information') #TODO: add a link to github page later / add option to automatically generate config file?
+        print(f'Fatal Error: Cannot locate config file at {args.config}. Run mmtester --new to create a new config file') 
         sys.exit(1)
         
     cfg = configparser.ConfigParser()
@@ -381,3 +388,5 @@ if __name__ == '__main__':
     print("Avg Log Scores:", log_scores / len(results), file=sys.stderr)
     
     
+if __name__ == '__main__':
+    main()
