@@ -11,9 +11,7 @@ setup(
     license = license,
     description = "Simple local tester for Topcoder's Marathon contests.",
     author = 'Psyho',
-    # author_email = 'your.email@domain.com',
     url = 'https://github.com/FakePsyho/mmtester',
-    # download_url = 'https://github.com/user/reponame/archive/v_01.tar.gz',    # I explain this later on
     keywords = ['Topcoder', 'Marathon', 'Tester'],
     install_requires=['tabulate'],
     classifiers = [
