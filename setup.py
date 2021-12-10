@@ -12,6 +12,7 @@ setup(
     description = "Simple local tester for Topcoder's Marathon contests.",
     author = 'Psyho',
     url = 'https://github.com/FakePsyho/mmtester',
+    download_url = 'https://github.com/FakePsyho/mmtester/archive/refs/tags/v0.1.0.tar.gz',
     keywords = ['Topcoder', 'Marathon', 'Tester'],
     install_requires=['tabulate'],
     classifiers = [
