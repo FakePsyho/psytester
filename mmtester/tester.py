@@ -233,6 +233,9 @@ def _main():
     args = parser.parse_args()
     
     if args.new:
+        if os.path.exists(args.config):
+            print(f'Fatal Error: Config file {args.config} already exists')
+            sys.exit(1)
         print(f'Creating new config file at {args.config}')
         shutil.copy(os.path.join(os.path.dirname(__file__), 'tester.cfg'), os.getcwd())
         sys.exit(0)
