@@ -1,8 +1,8 @@
 Simple local tester for Topcoder's Marathon contests. 
 
 # Setup
-- Install tabulate: `pip install tabulate`
-- Copy `tester.py` and `tester.cfg` to the directory with the problem
+- Install: `pip install mmtester`
+- Run `mmtester --new` in order to create a new config file in the current directory
 - Edit `tester.cfg` in order to set the number of threads, tester jar file, executable name & scoring function
 
 # Main Features
