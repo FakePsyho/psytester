@@ -50,10 +50,7 @@ from typing import List, Dict, Union
 import queue
 from threading import Thread
 
-global args
 args = None
-
-global cfg
 cfg = None
 
 DEFAULT_CONFIG_PATH = 'tester.cfg'
@@ -97,16 +94,6 @@ def run_test(seed) -> Dict:
     if cfg['general']['keep_output_files'].lower() != 'true':
         os.remove(output_path)
     return rv
-    
-    
-def worker():
-    while True:
-        try:
-            seed = tests_queue.get(False)
-        except queue.Empty:
-            return
-        result = run_test(seed)
-        results_queue.put(result)
     
     
 def find_res_files(dir='.'):
@@ -211,6 +198,9 @@ def show_summary(runs: Dict[str, Dict[int, float]], tests: Union[None, List[int]
         
 
 def _main():
+    global args
+    global cfg
+
     parser = argparse.ArgumentParser(description='Tester for Marathon Matches')
     parser.add_argument('name', type=str, nargs='?', default=None, help='name of the run') 
     parser.add_argument('-c', '--config', type=str, default=DEFAULT_CONFIG_PATH, help='path to cfg file')
@@ -351,7 +341,17 @@ def _main():
         for id in args.tests:
             tests_queue.put(id)
         tests_left = args.tests
-        workers = [Thread(target=worker) for _ in range(args.threads_no)]
+        
+        def worker_loop():
+            while True:
+                try:
+                    seed = tests_queue.get(False)
+                except queue.Empty:
+                    return
+                result = run_test(seed)
+                results_queue.put(result)
+        
+        workers = [Thread(target=worker_loop) for _ in range(args.threads_no)]
         for worker in workers:
             worker.start()
         
@@ -392,4 +392,4 @@ def _main():
     
     
 if __name__ == '__main__':
-    main()
+    _main()
