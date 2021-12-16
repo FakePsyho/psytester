@@ -211,7 +211,9 @@ def _main():
     parser.add_argument('-a', '--tester_arguments', type=str, default='', help='additional arguments for the tester')
     parser.add_argument('-b', '--benchmark', type=str, default=None, help='benchmark res file to test against')
     parser.add_argument('-s', '--show', action='store_true', help='shows current results') 
-    parser.add_argument('--new', action='store_true', help='creates a new config in the current directory')
+    parser.add_argument('--new-config', action='store_true', help='creates a new config in the current directory (using default one)')
+    parser.add_argument('--update-config', action='store_true', help='updates default config')
+    parser.add_argument('--restore-config', action='store_true', help='restores default config to the original one')
     parser.add_argument('--data', type=str, default=None, help='file with metadata, used for grouping and filtering; in order to always use latest results file set it to LATEST') 
     parser.add_argument('--filters', type=str, default=None, nargs='+', help='filters results based on criteria') 
     parser.add_argument('--groups', type=str, default=None, nargs='+', help='groups results into different groups based on criteria') 
@@ -222,16 +224,26 @@ def _main():
     
     args = parser.parse_args()
     
-    if args.new:
+    if args.new_config:
         if os.path.exists(args.config):
             print(f'Fatal Error: Config file {args.config} already exists')
             sys.exit(1)
         print(f'Creating new config file at {args.config}')
-        shutil.copy(os.path.join(os.path.dirname(__file__), 'tester.cfg'), os.getcwd())
+        shutil.copy(os.path.join(os.path.dirname(__file__), 'tester.cfg'), os.path.join(os.getcwd(), args.config))
+        sys.exit(0)
+        
+    if args.update_config:
+        assert os.path.exists(args.config)
+        print(f'Updating default config with {args.config}')
+        shutil.copy(os.path.join(os.getcwd(), args.config), os.path.join(os.path.dirname(__file__), 'tester.cfg'))
+        sys.exit(0)
+        
+    if args.restore_config:
+        shutil.copy(os.path.join(os.path.dirname(__file__), 'backup.cfg'), os.path.join(os.path.dirname(__file__), 'tester.cfg'))
         sys.exit(0)
     
     if not os.path.exists(args.config):
-        print(f'Fatal Error: Cannot locate config file at {args.config}. Run mmtester --new to create a new config file') 
+        print(f'Fatal Error: Cannot locate config file at {args.config}. Run mmtester --new-config to create a new config file') 
         sys.exit(1)
         
     cfg = configparser.ConfigParser()

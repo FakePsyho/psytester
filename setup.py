@@ -3,7 +3,7 @@ from setuptools import setup
 setup(
     name = 'mmtester',
     packages = ['mmtester'],
-    package_data = {'mmtester': ['tester.cfg']},
+    package_data = {'mmtester': ['tester.cfg', 'backup.cfg']},
     version = __import__('mmtester').__version__,
     license = 'MIT',
     description = "Simple local tester for Topcoder's Marathon contests.",
