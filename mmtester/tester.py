@@ -5,32 +5,28 @@
 
 #TODO:
 # HIGH PRIORITY:
-# -check for config in current dir otherwise use default & add tool to bin
-# -add parameter to use tests/run_name/. instead of tests/.
-# -fix double printing progress (HOW?)
-# -fix problem when missing score (HOW?)
 # -add auto buckets for groups like D(3) or D=2-10(4)
+# -create proper ReadMe
+# -more error checking / clearer error messages
+# -fix grouping/filtering if data file doesn't contain all test cases
+# -add warnings if data is not present for all test cases?
+# -config: merge subgroups (you need at least one?)
+# -fix double printing progress bug
 # LOW PRIORITY:
+# -add parameter to use tests/ instead of tests/run_name/
 # -use --tests for --find?
 # -add wrapper for fatal errors
 # -show: print the # of tests for each group (line below the header?)
 # -show: add transpose
-# -more error checking / clearer error messages
 # -add comments to code (explaining functions should be enough)
 # -add more annotations to functions
-# -add "--data LATEST" so that newest res file is always used for metadata
-# -fix grouping/filtering if data file doesn't contain all test cases
-# -add warnings if data is not present for all test cases?
 # -add support for custom scoring (cfg would be python code?)
 # -add RUNNER parameters (like for hash code) (Moved to RUNNER?)
 # -add batching? (Moved to RUNNER?)
 # -sync with RUNNER? (how?)
 # -add cleanup on ctrl+c (what that would be?)
-# -add to pypi
-# -automatic way to install dependencies (pip install tabulate + ??)
 # -change to subparsers (exec / show / find?)
 # ???:
-# -is cfg[...][...] really the best way to store config? converting types is really ugly :(
 # -is it possible to shrink the column name with tabulate (cur min is header width + 2 spaces)
 
 
@@ -74,25 +70,38 @@ def try_str_to_numeric(x):
 
 def run_test(seed) -> Dict:
     run_dir = args.name or '_default'
-    output_path = f'{cfg["general"]["tests_dir"]}/{run_dir}/seed{seed}.out'
+    output_path = f'{cfg["general"]["tests_dir"]}/{run_dir}/{seed}.out'
     if not os.path.exists(os.path.dirname(output_path)):
-        os.mkdir(os.path.dirname(output_path))
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
     
-    subprocess.run(f'{cfg["general"]["run_cmd"]} -exec "{args.exec}" -seed {seed} {args.tester_arguments} > {output_path}', shell=True)
+    output_files = [output_path]
+    cmd = f'{cfg["general"]["run_cmd"]} -exec "{args.exec}" -seed {seed} {args.tester_arguments}'
+    if args.tc_tester in ['new', 'newrt']:  
+        output_files.append(f'{cfg["general"]["tests_dir"]}/{run_dir}/{seed}.err')
+        cmd += f' -saveSolError {cfg["general"]["tests_dir"]}/{run_dir} -no'
+        if args.tc_tester == 'newrt':
+            cmd += ' -pr'
+            
+    subprocess.run(f'{cmd} > {output_path}', shell=True)
     rv = {'id': seed}
-    with open(output_path) as f:
-        for line in f:
-            tokens = line.split()
-            if len(tokens) == 3 and tokens[0] == 'Score' and tokens[1] == '=':
-                rv['score'] = float(tokens[2])
-            if len(tokens) == 4 and tokens[0] == '[DATA]' and tokens[2] == '=':
-                rv[tokens[1]] = try_str_to_numeric(tokens[3])
+    for output_file in output_files:
+        with open(output_file) as f:
+            for line in f:
+                # XXX: maybe change regex if they aren't much slower
+                tokens = line.split()
+                if len(tokens) == 3 and tokens[0] == 'Score' and tokens[1] == '=':
+                    rv['score'] = float(tokens[2])
+                if len(tokens) == 7 and tokens[0] == 'Score' and tokens[1] == '=' and tokens[3] == 'RunTime' and tokens[4] == '=' and tokens[6] == 'ms':
+                    rv['score'] = float(tokens[2][:-1])
+                    rv['time'] = float(tokens[5])
+                if len(tokens) == 4 and tokens[0] == '[DATA]' and tokens[2] == '=':
+                    rv[tokens[1]] = try_str_to_numeric(tokens[3])
+        if cfg['general']['keep_output_files'].lower() != 'true':
+            os.remove(output_file)
                 
     if 'score' not in rv:
         print(f'\r[Error] Seed: {seed} cointains no score')
         
-    if cfg['general']['keep_output_files'].lower() != 'true':
-        os.remove(output_path)
     return rv
     
     
@@ -145,7 +154,7 @@ def show_summary(runs: Dict[str, Dict[int, float]], tests: Union[None, List[int]
         # TODO: error check if tests are cointained in intersection of all results files?
         pass
 
-    if not data and (filter or groups):
+    if not data and (filters or groups):
         print('[Error] Filter used but no data is provided')
         sys.exit(1)
         
@@ -211,6 +220,7 @@ def _main():
     parser.add_argument('-a', '--tester_arguments', type=str, default='', help='additional arguments for the tester')
     parser.add_argument('-b', '--benchmark', type=str, default=None, help='benchmark res file to test against')
     parser.add_argument('-s', '--show', action='store_true', help='shows current results') 
+    parser.add_argument('--tc-tester', default=None, choices=['old','new','newrt'], help='type of tc tester, refer to config file for more information')
     parser.add_argument('--new-config', action='store_true', help='creates a new config in the current directory (using default one)')
     parser.add_argument('--update-config', action='store_true', help='updates default config')
     parser.add_argument('--restore-config', action='store_true', help='restores default config to the original one')
@@ -249,7 +259,7 @@ def _main():
     cfg = configparser.ConfigParser()
     cfg.read(args.config)
     
-    #XXX: probably there's a better to do this
+    # XXX: probably there's a better to do this
     def convert(value, type=str):
         if value is None or value == '':
             return None
@@ -263,6 +273,7 @@ def _main():
     args.exec = args.exec or convert(cfg['default']['exec'], str)
     args.progress = args.progress or convert(cfg['default']['progress'], bool)
     args.benchmark = args.benchmark or convert(cfg['default']['benchmark'])
+    args.tc_tester = args.tc_tester or cfg['default']['tc_tester']
     args.tester_arguments = args.tester_arguments or cfg['default']['tester_arguments'] 
     args.data = args.data or cfg['default']['data']
     args.scale = args.scale or convert(cfg['default']['scale'], float)
