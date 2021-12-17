@@ -1,7 +1,7 @@
 Simple local tester for Topcoder's Marathon contests. 
 
 # Setup
-- Install the latest version: `pip install mmtester --upgrade'
+- Install the latest version: `pip install mmtester --upgrade`
 - Run `mmtester --new-config` in order to create a new config file in the current directory
 - Edit `tester.cfg` in order to set the number of threads, tester jar file, executable name & scoring function
 
