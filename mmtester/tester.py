@@ -5,7 +5,6 @@
 
 #TODO:
 # HIGH PRIORITY:
-# -add auto buckets for groups like D(3) or D=2-10(4)
 # -create proper ReadMe
 # -more error checking / clearer error messages
 # -fix grouping/filtering if data file doesn't contain all test cases
@@ -17,7 +16,9 @@
 # -custom folder for res files
 # -add scripts for updating 
 # -add changelog to github
+
 # LOW PRIORITY:
+# -add option to shorten group names?
 # -add parameter to use tests/ instead of tests/run_name/
 # -use --tests for --find?
 # -add wrapper for fatal errors
@@ -177,6 +178,21 @@ def show_summary(runs: Dict[str, Dict[int, float]], tests: Union[None, List[int]
             if '=' in group:
                 group_names.append(group)
                 group_tests.append(apply_filter(tests, data, group))
+            elif '(' in group and ')' in group:
+                var, bins = group[:-1].split('(')
+                bins = int(bins)
+                values = sorted([data[test][var] for test in tests])
+                # XXX: probably there's a better way to split values into bins
+                pos_start = 0
+                for bin in range(bins):
+                    pos_end = (bin+1) * len(tests) // bins
+                    while pos_end < len(tests) and values[pos_end] == values[pos_end-1]: pos_end += 1
+                    if pos_end <= pos_start: 
+                        continue
+                    group_name = f'{var}={values[pos_start]}-{values[pos_end-1]}'
+                    group_names.append(group_name)
+                    group_tests.append(apply_filter(tests, data, group_name))
+                    pos_start = pos_end
             else:
                 var = group
                 var_set = sorted(set([data[test][var] for test in tests]))
