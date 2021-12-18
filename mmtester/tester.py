@@ -12,6 +12,11 @@
 # -add warnings if data is not present for all test cases?
 # -config: merge subgroups (you need at least one?)
 # -fix double printing progress bug
+# -add option to generate scripts (c/r/v/s/n -- should be OS-dependent?)
+#  -above + customization of scripts in the config
+# -custom folder for res files
+# -add scripts for updating 
+# -add changelog to github
 # LOW PRIORITY:
 # -add parameter to use tests/ instead of tests/run_name/
 # -use --tests for --find?
@@ -160,7 +165,7 @@ def show_summary(runs: Dict[str, Dict[int, float]], tests: Union[None, List[int]
         
     if filters:
         for filter in filters:
-            tests = apply_filter(tests, filter)
+            tests = apply_filter(tests, data, filter)
             
     group_names = []
     group_tests = []
