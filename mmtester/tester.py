@@ -200,7 +200,7 @@ def show_summary(runs: Dict[str, Dict[int, float]], tests: Union[None, List[int]
                     group_names.append(f'{var}={value}')
                     group_tests.append(apply_filter(tests, data, f'{var}={value}'))
         
-    headers = ['Run'] + group_names + ['Fails']
+    headers = ['Tests\nRun'] + [f'{len(tests)}\n{name}' for name, tests in zip(group_names, group_tests)] + ['\nFails']
         
     table = [[run_name] for run_name in runs]
     
@@ -217,8 +217,6 @@ def show_summary(runs: Dict[str, Dict[int, float]], tests: Union[None, List[int]
     
     for i, run_name in enumerate(runs):
         table[i].append(total_fails[run_name])
-    
-    print('Total Tests:', len(tests))
     
     if args.scale:
         total_scores = {run_name: score * args.scale / len(tests) for run_name, score in total_scores.items()}
