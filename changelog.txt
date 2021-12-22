@@ -1,0 +1,9 @@
+[current]
+* --groups: added VAR@N to automatically create N equally-sized bins for VAR variable
+* --show: prints number of tests for each group at the top
+[0.2.0]
+* added --XXX-config commands
+* support for new topcoder's testers, can automatically extract time
+* lots of bug fixes
+[0.1.0] 
+* initial broken version

@@ -17,6 +17,7 @@
 # -add scripts for updating 
 # -add changelog to github
 # -investigate issue with = character in bat files
+# -mode show simple histogram for stats
 
 # LOW PRIORITY:
 # -add option to shorten group names?
