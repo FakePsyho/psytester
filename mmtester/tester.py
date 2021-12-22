@@ -16,14 +16,16 @@
 # -custom folder for res files
 # -add scripts for updating 
 # -add changelog to github
+# -investigate issue with = character in bat files
 
 # LOW PRIORITY:
 # -add option to shorten group names?
 # -add parameter to use tests/ instead of tests/run_name/
 # -use --tests for --find?
 # -add wrapper for fatal errors
-# -show: print the # of tests for each group (line below the header?)
 # -show: add transpose
+# -add support for open ranges in groups/filters (i.e. X=-A / X=A-)
+# -add option for precision in scoring
 # -add comments to code (explaining functions should be enough)
 # -add more annotations to functions
 # -add support for custom scoring (cfg would be python code?)
@@ -34,6 +36,7 @@
 # -change to subparsers (exec / show / find?)
 # ???:
 # -is it possible to shrink the column name with tabulate (cur min is header width + 2 spaces)
+# -is it possible to monitor cpu% and issue warning (too many threads); useful for running on cloud with tons of threads
 
 
 import tabulate
@@ -178,8 +181,8 @@ def show_summary(runs: Dict[str, Dict[int, float]], tests: Union[None, List[int]
             if '=' in group:
                 group_names.append(group)
                 group_tests.append(apply_filter(tests, data, group))
-            elif '(' in group and ')' in group:
-                var, bins = group[:-1].split('(')
+            elif '@' in group:
+                var, bins = group.split('@')
                 bins = int(bins)
                 values = sorted([data[test][var] for test in tests])
                 # XXX: probably there's a better way to split values into bins
