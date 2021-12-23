@@ -13,7 +13,6 @@
 # -fix double printing progress bug
 # -add option to generate scripts (c/r/v/s/n -- should be OS-dependent?)
 #  -above + customization of scripts in the config
-# -custom folder for res files
 # -add scripts for updating 
 # -add changelog to github
 # -investigate issue with = character in bat files
@@ -390,6 +389,9 @@ def _main():
     assert args.threads_no >= 1
     fout = sys.stdout
     if args.name:
+        if not os.path.exists(cfg["general"]["results_dir"]):
+            os.makedirs(cfg["general"]["results_dir"], exist_ok=True)
+    
         fout = open(f'{cfg["general"]["results_dir"]}/{args.name}{cfg["general"]["results_ext"]}', 'w')
         
     #TODO: add errors handling/warnings for benchmark file (file not existing, no full test coverage)
