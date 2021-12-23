@@ -2,7 +2,8 @@
 * versioning support (config files store the version of mmtester)
 * --groups: added VAR@N to automatically create N equally-sized bins for VAR variable
 * --show: prints number of tests for each group at the top
-* merge_output_dirs config option to reduce the number of output files
+* general/merge_output_dirs config option to reduce the number of output files
+* general/precision for custom precision of scores
 [0.2.0]
 * added --XXX-config commands
 * support for new topcoder's testers, can automatically extract time

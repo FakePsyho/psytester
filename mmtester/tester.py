@@ -25,7 +25,6 @@
 # -add wrapper for fatal errors
 # -show: add transpose
 # -add support for open ranges in groups/filters (i.e. X=-A / X=A-)
-# -add option for precision in scoring
 # -add comments to code (explaining functions should be enough)
 # -add more annotations to functions
 # -add support for custom scoring (cfg would be python code?)
@@ -231,7 +230,7 @@ def show_summary(runs: Dict[str, Dict[int, float]], tests: Union[None, List[int]
 
     if hasattr(tabulate, 'MIN_PADDING'):
         tabulate.MIN_PADDING = 0
-    print(tabulate.tabulate(table, headers=headers))
+    print(tabulate.tabulate(table, headers=headers, floatfmt=f'.{cfg["general"]["precision"]}f'))
         
 
 def _main():
