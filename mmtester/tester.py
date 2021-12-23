@@ -18,10 +18,11 @@
 # -add changelog to github
 # -investigate issue with = character in bat files
 # -mode show simple histogram for stats
+# -gentle cleanup when threads raise exceptions (main thread waits forever)
 
 # LOW PRIORITY:
+# -add a future proof mechanism for missing lines in config files? (will happen if someones updates the tester but the config file will stay the same)
 # -add option to shorten group names?
-# -add parameter to use tests/ instead of tests/run_name/
 # -use --tests for --find?
 # -add wrapper for fatal errors
 # -show: add transpose
@@ -56,6 +57,8 @@ from typing import List, Dict, Union
 import queue
 from threading import Thread
 
+from . import __version__
+
 args = None
 cfg = None
 
@@ -80,15 +83,18 @@ def try_str_to_numeric(x):
 
 def run_test(seed) -> Dict:
     run_dir = args.name or '_default'
-    output_path = f'{cfg["general"]["tests_dir"]}/{run_dir}/{seed}.out'
+    
+    output_dir = cfg["general"]["tests_dir"] + (f'/{run_dir}' if cfg["general"]["merge_output_dirs"].lower() == "false" else '')
+    
+    output_path = f'{output_dir}/{seed}.out'
     if not os.path.exists(os.path.dirname(output_path)):
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
     
     output_files = [output_path]
     cmd = f'{cfg["general"]["run_cmd"]} -exec "{args.exec}" -seed {seed} {args.tester_arguments}'
     if args.tc_tester in ['new', 'newrt']:  
-        output_files.append(f'{cfg["general"]["tests_dir"]}/{run_dir}/{seed}.err')
-        cmd += f' -saveSolError {cfg["general"]["tests_dir"]}/{run_dir} -no'
+        output_files.append(f'{output_dir}/{seed}.err')
+        cmd += f' -saveSolError {output_dir} -no'
         if args.tc_tester == 'newrt':
             cmd += ' -pr'
             
@@ -281,6 +287,13 @@ def _main():
         
     cfg = configparser.ConfigParser()
     cfg.read(args.config)
+    
+    if cfg['general']['version'] != __version__:
+        print(f"Fatal Error: {args.config} version ({cfg['general']['version']}) doesn't match the current version of mmtester {__version__}")
+        print("Unfortunately mmtester is currently not backwards compatible with old config files")
+        print("The easiest way to resolve the problem is to manually update your config file with changes introduced in the new version (create a new config file with --new-config)")
+        print("Alternatively, you can downgrade your version of mmtester to match the config file")
+        sys.exit(1)
     
     # XXX: probably there's a better to do this
     def convert(value, type=str):

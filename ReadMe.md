@@ -19,6 +19,7 @@ Simple local tester for Topcoder's Marathon contests.
 
 # Notes
 - **(Should be fixed now `--tc-tester new` uses new tester functionality to split stderr & stdout)** There's a frequent problem with marathon testers where stderr (debug stuff) and stdout (official output from the tester) is mangled together. If it happens then `mmtester` will be unable to read the score and unfortunately the whole run will fail. There's currently no nice workaround for this and the best way to avoid this problem is to edit the source code of the java tester and either add locking mechanism on output or add some sleep just before printing the score.
+- Currently mmtester is not backward compatible with old config files, you'll have to manually update the config file to a new version if you update mmtester while working on the same problem. This should change in the future versions.
 - There's a tiny bug where sometimes progress is double printed
 - Feel free to report any errors and/or feature requests (DMing me on twitter might be the easiest way of getting my attention). Can't promise anything, but I might consider fixing/adding those.
 - It should be easy to extend to other contests with similar structure (i.e. single-player problems). You will have to edit the `run_test` function.
