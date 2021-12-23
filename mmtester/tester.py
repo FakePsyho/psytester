@@ -13,7 +13,6 @@
 # -fix double printing progress bug
 # -add option to generate scripts (c/r/v/s/n -- should be OS-dependent?)
 #  -above + customization of scripts in the config
-# -add scripts for updating 
 # -add changelog to github
 # -investigate issue with = character in bat files
 # -mode show simple histogram for stats
@@ -36,7 +35,6 @@
 # -add cleanup on ctrl+c (what that would be?)
 # -change to subparsers (exec / show / find?)
 # ???:
-# -is it possible to shrink the column name with tabulate (cur min is header width + 2 spaces)
 # -is it possible to monitor cpu% and issue warning (too many threads); useful for running on cloud with tons of threads
 
 
@@ -230,7 +228,9 @@ def show_summary(runs: Dict[str, Dict[int, float]], tests: Union[None, List[int]
     if args.scale:
         total_scores = {run_name: score * args.scale / len(tests) for run_name, score in total_scores.items()}
     longest_name = max([len(run_name) for run_name in runs])
-        
+
+    if hasattr(tabulate, 'MIN_PADDING'):
+        tabulate.MIN_PADDING = 0
     print(tabulate.tabulate(table, headers=headers))
         
 
