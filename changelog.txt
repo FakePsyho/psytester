@@ -1,3 +1,6 @@
+[current]
+* --show: # of bests/uniques for each run (can be disable in the config)
+* --show: option for autohiding fails when there are no failed testcases
 [0.2.1]
 * versioning support (config files store the version of mmtester)
 * --groups: added VAR@N to automatically create N equally-sized bins for VAR variable

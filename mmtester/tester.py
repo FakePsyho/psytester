@@ -33,6 +33,7 @@
 
 # ???:
 # -is it possible to monitor cpu% and issue warning (too many threads); useful for running on cloud with tons of threads
+# -add html export for --show?
 
 
 import tabulate
@@ -138,7 +139,7 @@ def load_res_file(path) -> Dict[int, float]:
     return {result['id']: result for result in results} 
 
 
-def process_raw_scores(scores: List[float], scoring: str): 
+def process_raw_scores(scores: List[float], scoring: str) -> List[float]: 
     if scoring=='raw':
         return scores
     if scoring=='min':
@@ -215,23 +216,42 @@ def show_summary(runs: Dict[str, Dict[int, float]], tests: Union[None, List[int]
                     group_names.append(f'{var}={value}')
                     group_tests.append(apply_filter(tests, data, f'{var}={value}'))
         
-    headers = ['Tests\nRun'] + [f'{len(tests)}\n{name}' for name, tests in zip(group_names, group_tests)] + ['\nFails']
+    headers = ['Tests\nRun'] + [f'{len(tests)}\n{name}' for name, tests in zip(group_names, group_tests)]
         
     table = [[run_name] for run_name in runs]
     
     total_fails = {run_name: 0 for run_name in runs}
-    for group_test in group_tests:
+    total_bests = {run_name: 0 for run_name in runs}
+    total_uniques = {run_name: 0 for run_name in runs}
+    for group_no, group_test in enumerate(group_tests):
         total_scores = {run_name: 0.0 for run_name in runs}
         for test in group_test:
             scores = process_raw_scores([run_results[test]['score'] for run_results in runs.values()], args.scoring)
+            best_score = max(scores)
+            unique_best = len([score for score in scores if score == best_score]) == 1
             for run_name, score in zip(runs.keys(), scores):
                 total_scores[run_name] += score
-                total_fails[run_name] += 1 if score <= 0 else 0
+                if group_no == 0:
+                    total_fails[run_name] += 1 if score <= 0 else 0
+                    total_bests[run_name] += 1 if score == best_score else 0
+                    total_uniques[run_name] += 1 if score == best_score and unique_best else 0
+                    
         for i, run_name in enumerate(runs):
             table[i].append(total_scores[run_name] * (args.scale / max(1, len(group_test)) if args.scale else 1.0))
     
-    for i, run_name in enumerate(runs):
-        table[i].append(total_fails[run_name])
+    if cfg['general']['show_bests'].lower() == 'true':
+        headers.append('\nBests')
+        for i, run_name in enumerate(runs):
+            table[i].append(total_bests[run_name])
+    if cfg['general']['show_uniques'].lower() == 'true':
+        headers.append('\nUniques')
+        for i, run_name in enumerate(runs):
+            table[i].append(total_uniques[run_name])
+    if cfg['general']['autohide_fails'].lower() == 'false' or max(total_fails.values()) > 0:
+        headers.append('\nFails')
+        for i, run_name in enumerate(runs):
+            table[i].append(total_fails[run_name])
+        
     
     if args.scale:
         total_scores = {run_name: score * args.scale / max(1, len(tests)) for run_name, score in total_scores.items()}
