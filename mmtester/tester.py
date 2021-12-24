@@ -13,8 +13,6 @@
 # -fix double printing progress bug
 # -add option to generate scripts (c/r/v/s/n -- should be OS-dependent?)
 #  -above + customization of scripts in the config
-# -add changelog to github
-# -investigate issue with = character in bat files
 # -mode show simple histogram for stats
 # -gentle cleanup when threads raise exceptions (main thread waits forever)
 
@@ -22,7 +20,6 @@
 # -add a future proof mechanism for missing lines in config files? (will happen if someones updates the tester but the config file will stay the same)
 # -add option to shorten group names?
 # -use --tests for --find?
-# -add wrapper for fatal errors
 # -show: add transpose
 # -add support for open ranges in groups/filters (i.e. X=-A / X=A-)
 # -add comments to code (explaining functions should be enough)
@@ -173,13 +170,18 @@ def show_summary(runs: Dict[str, Dict[int, float]], tests: Union[None, List[int]
     else:
         # TODO: error check if tests are cointained in intersection of all results files?
         pass
+        
+    if not tests:
+        fatal_error('There are no common tests within the results files (maybe one of the results files is empty?)')
 
     if not data and (filters or groups):
         fatal_error('Filter used but no data is provided')
         
     if filters:
+        initial_tests_no = len(tests)
         for filter in filters:
             tests = apply_filter(tests, data, filter)
+        print(f'Filtered {initial_tests_no} tests to {len(tests)}')
             
     group_names = []
     group_tests = []
@@ -226,13 +228,13 @@ def show_summary(runs: Dict[str, Dict[int, float]], tests: Union[None, List[int]
                 total_scores[run_name] += score
                 total_fails[run_name] += 1 if score <= 0 else 0
         for i, run_name in enumerate(runs):
-            table[i].append(total_scores[run_name] * (args.scale / len(group_test) if args.scale else 1.0))
+            table[i].append(total_scores[run_name] * (args.scale / max(1, len(group_test)) if args.scale else 1.0))
     
     for i, run_name in enumerate(runs):
         table[i].append(total_fails[run_name])
     
     if args.scale:
-        total_scores = {run_name: score * args.scale / len(tests) for run_name, score in total_scores.items()}
+        total_scores = {run_name: score * args.scale / max(1, len(tests)) for run_name, score in total_scores.items()}
     longest_name = max([len(run_name) for run_name in runs])
 
     if hasattr(tabulate, 'MIN_PADDING'):
@@ -366,6 +368,9 @@ def _main():
     # Mode: Summary 
     if args.show:
         results_files = find_res_files(cfg['general']['results_dir'])
+        if not results_files:
+            fatal_error(f'There are no results files in the results folder: {cfg["general"]["results_dir"]}')
+            
         if args.sorting == 'name':
             results_files = sorted(results_files)
         elif args.sorting == 'date':
