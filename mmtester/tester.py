@@ -33,6 +33,7 @@
 # -sync with RUNNER? (how?)
 # -add cleanup on ctrl+c (what that would be?)
 # -change to subparsers (exec / show / find?)
+
 # ???:
 # -is it possible to monitor cpu% and issue warning (too many threads); useful for running on cloud with tons of threads
 
@@ -75,6 +76,15 @@ def try_str_to_numeric(x):
             return float(x)
         except ValueError:
             return x
+            
+
+def fatal_error(msgs):
+    if isinstance(msgs, str):
+        msgs = [msgs]
+    print('Fatal Error:', msgs[0])
+    for msg in msgs[1:]:
+        print(msg)
+    sys.exit(1)
 
 
 def run_test(seed) -> Dict:
@@ -123,8 +133,7 @@ def find_res_files(dir='.'):
     
 def load_res_file(path) -> Dict[int, float]:
     if not os.path.exists(path):
-        print(f'Fatal Error: Cannot locate {path} results file')
-        sys.exit(1)
+        fatal_error(f'Cannot locate {path} results file')
 
     with open(path) as f:
         lines = f.read().splitlines()
@@ -142,8 +151,7 @@ def process_raw_scores(scores: List[float], scoring: str):
         best_score = max([0] + [score for score in scores if score >= 0])
         return [score / best_score if score > 0 else 0 for score in scores]
     
-    print(f'Fatal Error: Unknown scoring function: {scoring}')
-    sys.exit(1)
+    fatal_error(f'Unknown scoring function: {scoring}')
         
     
 def apply_filter(tests, data, filter):
@@ -167,8 +175,7 @@ def show_summary(runs: Dict[str, Dict[int, float]], tests: Union[None, List[int]
         pass
 
     if not data and (filters or groups):
-        print('[Error] Filter used but no data is provided')
-        sys.exit(1)
+        fatal_error('Filter used but no data is provided')
         
     if filters:
         for filter in filters:
@@ -263,8 +270,7 @@ def _main():
     
     if args.new_config:
         if os.path.exists(args.config):
-            print(f'Fatal Error: Config file {args.config} already exists')
-            sys.exit(1)
+            fatal_error(f'Config file {args.config} already exists')
         print(f'Creating new config file at {args.config}')
         shutil.copy(os.path.join(os.path.dirname(__file__), 'tester.cfg'), os.path.join(os.getcwd(), args.config))
         sys.exit(0)
@@ -276,22 +282,21 @@ def _main():
         sys.exit(0)
         
     if args.restore_config:
+        print('Restoring default config to original state')
         shutil.copy(os.path.join(os.path.dirname(__file__), 'backup.cfg'), os.path.join(os.path.dirname(__file__), 'tester.cfg'))
         sys.exit(0)
     
     if not os.path.exists(args.config):
-        print(f'Fatal Error: Cannot locate config file at {args.config}. Run mmtester --new-config to create a new config file') 
-        sys.exit(1)
+        fatal_error(f'Cannot locate config file at {args.config}. Run mmtester --new-config to create a new config file') 
         
     cfg = configparser.ConfigParser()
     cfg.read(args.config)
     
     if cfg['general']['version'] != __version__:
-        print(f"Fatal Error: {args.config} version ({cfg['general']['version']}) doesn't match the current version of mmtester {__version__}")
-        print("Unfortunately mmtester is currently not backwards compatible with old config files")
-        print("The easiest way to resolve the problem is to manually update your config file with changes introduced in the new version (create a new config file with --new-config)")
-        print("Alternatively, you can downgrade your version of mmtester to match the config file")
-        sys.exit(1)
+        fatal_error([f"{args.config} version ({cfg['general']['version']}) doesn't match the current version of mmtester {__version__}",
+            "Unfortunately mmtester is currently not backwards compatible with old config files",
+            "The easiest way to resolve the problem is to manually update your config file with changes introduced in the new version (create a new config file with --new-config)",
+            "Alternatively, you can downgrade your version of mmtester to match the config file"])
     
     # XXX: probably there's a better to do this
     def convert(value, type=str):
@@ -341,8 +346,7 @@ def _main():
         args.tests = list(range(1, args.tests + 1))
     elif re.search('[a-zA-Z]', args.tests):
         if not os.path.exists(args.tests):
-            print(f'Fatal Error: Cannot locate {args.tests} file')
-            sys.exit(1)
+            fatal_error(f'Cannot locate {args.tests} file')
 
         with open(args.tests) as f:
             lines = f.read().splitlines()
@@ -382,8 +386,7 @@ def _main():
         os.mkdir(cfg['general']['tests_dir'])
         
     if not args.tests:
-        print('[Fatal Error] You need to specify tests to run, use --tests option')
-        sys.exit(1)
+        fatal_error('You need to specify tests to run, use --tests option')
     
     assert args.threads_no >= 1
     fout = sys.stdout
