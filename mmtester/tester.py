@@ -14,7 +14,6 @@
 # -add option to generate scripts (c/r/v/s/n -- should be OS-dependent?)
 #  -above + customization of scripts in the config
 # -mode show simple histogram for stats
-# -gentle cleanup when threads raise exceptions (main thread waits forever)
 
 # LOW PRIORITY:
 # -add a future proof mechanism for missing lines in config files? (will happen if someones updates the tester but the config file will stay the same)
@@ -47,6 +46,8 @@ import json
 import time
 import configparser
 import shutil
+import traceback
+import _thread
 from typing import List, Dict, Union
 import queue
 from threading import Thread
@@ -75,13 +76,17 @@ def try_str_to_numeric(x):
             return x
             
 
-def fatal_error(msgs):
+def fatal_error(msgs, exit_main=False):
     if isinstance(msgs, str):
         msgs = [msgs]
     print('Fatal Error:', msgs[0])
     for msg in msgs[1:]:
         print(msg)
-    sys.exit(1)
+        
+    if exit_main:
+        os._exit(1)
+    else:
+        sys.exit(1)
 
 
 def run_test(seed) -> Dict:
@@ -444,10 +449,13 @@ def _main():
             while True:
                 try:
                     seed = tests_queue.get(False)
+                    result = run_test(seed)
+                    results_queue.put(result)
                 except queue.Empty:
                     return
-                result = run_test(seed)
-                results_queue.put(result)
+                except:
+                    traceback.print_exc()
+                    fatal_error('One of the worker threads encountered an error', exit_main=True);
         
         workers = [Thread(target=worker_loop) for _ in range(args.threads_no)]
         for worker in workers:
