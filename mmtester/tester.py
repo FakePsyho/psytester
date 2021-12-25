@@ -21,7 +21,6 @@
 # -add option to shorten group names?
 # -use --tests for --find?
 # -show: add transpose
-# -add support for open ranges in groups/filters (i.e. X=-A / X=A-)
 # -add comments to code (explaining functions should be enough)
 # -add more annotations to functions
 # -add support for custom scoring (cfg would be python code?)
@@ -156,8 +155,8 @@ def apply_filter(tests, data, filter):
     var, range = filter.split('=')
     if '-' in range:
         lo, hi = range.split('-')
-        lo = try_str_to_numeric(lo)
-        hi = try_str_to_numeric(hi)
+        lo = try_str_to_numeric(lo) if lo else min([data[test][var] for test in tests])
+        hi = try_str_to_numeric(hi) if hi else max([data[test][var] for test in tests])
         return [test for test in tests if lo <= data[test][var] <= hi]
     else:
         value = try_str_to_numeric(range)
