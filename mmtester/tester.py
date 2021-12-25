@@ -20,7 +20,6 @@
 # -add a future proof mechanism for missing lines in config files? (will happen if someones updates the tester but the config file will stay the same)
 # -add option to shorten group names?
 # -use --tests for --find?
-# -show: add transpose
 # -add comments to code (explaining functions should be enough)
 # -add more annotations to functions
 # -add support for custom scoring (cfg would be python code?)
@@ -31,6 +30,7 @@
 # -change to subparsers (exec / show / find?)
 
 # ???:
+# -show: add transpose?
 # -is it possible to monitor cpu% and issue warning (too many threads); useful for running on cloud with tons of threads
 # -add html export for --show?
 
@@ -175,7 +175,7 @@ def show_summary(runs: Dict[str, Dict[int, float]], tests: Union[None, List[int]
         fatal_error('There are no common tests within the results files (maybe one of the results files is empty?)')
 
     if not data and (filters or groups):
-        fatal_error('Filter used but no data is provided')
+        fatal_error('Filters/Groups used but no data file is provided')
         
     if filters:
         initial_tests_no = len(tests)
@@ -288,7 +288,7 @@ def _main():
     parser.add_argument('--scale', type=float, help='sets scaling of results') 
     parser.add_argument('--scoring', type=str, default=None, help='sets the scoring function used for calculating ranking')
     parser.add_argument('--sorting', type=str, default=None, choices=['name', 'date'], help='sets how the show runs are sorted')
-    parser.add_argument('--find', type=str, default=None, nargs='+', help='usage: --find res_file var[+/-] [limit]; sorts tests by var (asceding / descending) and prints seeds; can be combined with --filters')
+    parser.add_argument('--find', type=str, default=None, nargs='+', help='usage: --find res_file var[+/-] [limit]; sorts tests by var (asceding / descending) and prints seeds; can be combined with --filters; you can use LATEST for res_file')
     
     args = parser.parse_args()
     
@@ -347,7 +347,14 @@ def _main():
     if args.find:
         assert len(args.find) in [2, 3]
         assert args.find[1][-1] in ['-', '+']
-        results = load_res_file(args.find[0] + cfg['general']['results_ext'])
+        
+        if args.find[0] == 'LATEST':
+            results_files = find_res_files(cfg['general']['results_dir'])
+            _, args.find[0] = sorted(zip([os.path.getmtime(result_file) for result_file in results_files], results_files))[-1]
+        else:
+            args.find[0] += cfg['general']['results_ext']
+        
+        results = load_res_file(args.find[0])
         tests = results.keys()
         for filter in args.filters or []:
             tests = apply_filter(tests, results, filter)
@@ -359,6 +366,7 @@ def _main():
         if len(args.find) == 3:
             ordered_tests = ordered_tests[:int(args.find[2])]
         
+        print(f'Finding in {args.find[0]} file')
         for test in ordered_tests:
             print(json.dumps(results[test]))
         sys.exit(0)
