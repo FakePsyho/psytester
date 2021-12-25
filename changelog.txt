@@ -1,5 +1,5 @@
-[current]
-* --show: # of bests/uniques for each run (can be disable in the config)
+[0.2.2]
+* --show: # of bests/uniques/gain for each run (enabled/disabled in config)
 * --show: option for autohiding fails when there are no failed testcases
 [0.2.1]
 * versioning support (config files store the version of mmtester)
