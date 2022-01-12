@@ -19,8 +19,6 @@
 # -add a future proof mechanism for missing lines in config files? (will happen if someones updates the tester but the config file will stay the same)
 # -add option to shorten group names?
 # -use --tests for --find?
-# -add comments to code (explaining functions should be enough)
-# -add more annotations to functions
 # -add support for custom scoring (cfg would be python code?)
 # -add RUNNER parameters (like for hash code) (Moved to RUNNER?)
 # -add batching? (Moved to RUNNER?)
@@ -32,6 +30,8 @@
 # -show: add transpose?
 # -is it possible to monitor cpu% and issue warning (too many threads); useful for running on cloud with tons of threads
 # -add html export for --show?
+# -add comments to code (explaining functions should be enough)
+# -add more annotations to functions
 
 
 import tabulate
@@ -99,7 +99,7 @@ def run_test(seed) -> Dict:
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
     
     output_files = [output_path]
-    cmd = f'{cfg["general"]["run_cmd"]} -exec "{args.exec}" -seed {seed} {args.tester_arguments}'
+    cmd = f'{cfg["general"]["run_cmd"]} {cfg["general"]["run_no_vis"]} -exec "{args.exec}" -seed {seed} {args.tester_arguments}'
     if args.tc_tester in ['new', 'newrt']:  
         output_files.append(f'{output_dir}/{seed}.err')
         cmd += f' -saveSolError {output_dir} -no'
@@ -294,6 +294,9 @@ def _main():
     parser.add_argument('--scoring', type=str, default=None, help='sets the scoring function used for calculating ranking')
     parser.add_argument('--sorting', type=str, default=None, choices=['name', 'date'], help='sets how the show runs are sorted')
     parser.add_argument('--find', type=str, default=None, nargs='+', help='usage: --find res_file var[+/-] [limit]; sorts tests by var (asceding / descending) and prints seeds; can be combined with --filters; you can use LATEST for res_file')
+    parser.add_argument('--generate-scripts', action='store_true', help='generates scripts defined in the config file')
+    parser.add_argument('--ip', type=str, default=None, help='optional argument for --generate-scripts')
+    parser.add_argument('--source', type=str, default=None, help='optional argument for --generate-scripts')
     
     args = parser.parse_args()
     
@@ -347,6 +350,39 @@ def _main():
     args.scale = args.scale or convert(cfg['default']['scale'], float)
     args.scoring = args.scoring or convert(cfg['default']['scoring'])
     args.sorting = args.sorting or convert(cfg['default']['sorting'])
+    
+    
+    if args.generate_scripts:
+        print('Generating Scripts')
+        for script_name in cfg['scripts']:
+            script = cfg.get('scripts', script_name, raw=True)
+            undefined = []
+            if '%RUN_CMD%' in script:
+                script = script.replace('%RUN_CMD%', cfg['general']['run_cmd'])
+            if '%EXEC%' in script:
+                script = script.replace('%EXEC%', args.exec)
+            if '%IP%' in script:
+                if not args.ip:
+                    undefined.append('missing %IP% (use --ip IP)')
+                else:
+                    script = script.replace('%IP%', args.ip)
+            if '%SOURCE%' in script:
+                if not args.source:
+                    undefined.append('missing %SOURCE% (use --source SOURCE)')
+                else:
+                    script = script.replace('%SOURCE%', args.source)
+                    
+            if undefined:
+                print(f'Ignoring script {script_name} because of {undefined}')
+                continue
+                
+            with open(script_name, 'w') as f:
+                for i, line in enumerate(script.split('\\n')):
+                    prefix = f'{script_name} ='
+                    print(prefix if i == 0 else ' ' * len(prefix), line)
+                    print(line, file=f)
+        sys.exit(0)
+    
     
     # Mode: Find
     if args.find:

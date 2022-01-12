@@ -1,3 +1,5 @@
+[0.3.0]
+* added --generate-scripts (initial support, format might change in the future)
 [0.2.2]
 * --show: # of bests/uniques/gain for each run (enabled/disabled in config)
 * --show: option for autohiding fails when there are no failed testcases
