@@ -1,3 +1,7 @@
+[0.4.0]
+* added support atcoder heuristic contests
+* new & improved documentation
+* renamed/added bunch of cfg options to accommodate for atcoder support
 [0.3.0]
 * added --generate-scripts (initial support, format might change in the future)
 [0.2.2]

@@ -14,6 +14,12 @@
 # -add option to generate scripts (c/r/v/s/n -- should be OS-dependent?)
 #  -above + customization of scripts in the config
 # -mode show simple histogram for stats
+# -add atcoder support
+# -test functionality for atcoder
+# -double check that topcoder functional is not broken
+# -find a way to make atcoder score consistent with local (score_mul parameter?)
+# -implement atcoder_gen_cache (temp folder?)
+# -add support for multiple configs via --new-config / --restore-config
 
 # LOW PRIORITY:
 # -add a future proof mechanism for missing lines in config files? (will happen if someones updates the tester but the config file will stay the same)
@@ -25,6 +31,9 @@
 # -sync with RUNNER? (how?)
 # -add cleanup on ctrl+c (what that would be?)
 # -change to subparsers (exec / show / find?)
+# -simplify parameters in config (some parameters are redundant)
+# -add autodetect for atcoder run/gen cmd (should be easy if files have original names)
+# -add some lock against running atcoder's gen multiple times at the same time
 
 # ???:
 # -show: add transpose?
@@ -89,29 +98,36 @@ def fatal_error(msgs, exit_main=False):
         sys.exit(1)
 
 
-def run_test(seed) -> Dict:
+def run_test(test) -> Dict:
+    seed = test['seed']
+
     run_dir = args.name or '_default'
     
     output_dir = cfg["general"]["tests_dir"] + (f'/{run_dir}' if cfg["general"]["merge_output_dirs"].lower() == "false" else '')
     
-    output_path = f'{output_dir}/{seed}.out'
-    if not os.path.exists(os.path.dirname(output_path)):
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    stdout_path = f'{output_dir}/{seed}.out'
+    stderr_path = f'{output_dir}/{seed}.err'
+    os.makedirs(output_dir, exist_ok=True)
     
-    output_files = [output_path]
-    cmd = f'{cfg["general"]["run_cmd"]} {cfg["general"]["run_no_vis"]} -exec "{args.exec}" -seed {seed} {args.tester_arguments}'
-    if args.tc_tester in ['new', 'newrt']:  
-        output_files.append(f'{output_dir}/{seed}.err')
-        cmd += f' -saveSolError {output_dir} -no'
-        if args.tc_tester == 'newrt':
-            cmd += ' -pr'
-            
-    subprocess.run(f'{cmd} > {output_path}', shell=True)
+    output_files = []
+    cmd = ''
+    
+    if args.platform == 'old_tc':
+        cmd = f'{cfg["general"]["tc_run_cmd"]} {cfg["general"]["tc_run_no_vis"]} -exec "{args.exec}" -seed {seed} {args.tester_arguments} > {stdout_path}'
+        output_files = [stdout_path]
+    elif args.platform == 'tc':
+        cmd = f'{cfg["general"]["tc_run_cmd"]} {cfg["general"]["tc_run_no_vis"]} -saveSolError {output_dir} -no -pr -exec "{args.exec}" -seed {seed} {args.tester_arguments} > {stdout_path}'
+        output_files = [stdout_path, stderr_path]
+    elif args.platform == 'atcoder':
+        cmd = f'{cfg["general"]["atcoder_run_cmd"]} "{args.exec}" < {test["path"]} > {stdout_path} 2> {stderr_path}'
+        output_files = [stdout_path, stderr_path]
+        
+    subprocess.run(cmd, shell=True)
     rv = {'id': seed}
     for output_file in output_files:
         with open(output_file) as f:
             for line in f:
-                # XXX: maybe change regex if they aren't much slower
+                # XXX: maybe change to regex if they aren't much slower
                 tokens = line.split()
                 if len(tokens) == 3 and tokens[0] == 'Score' and tokens[1] == '=':
                     rv['score'] = float(tokens[2])
@@ -283,7 +299,7 @@ def _main():
     parser.add_argument('-a', '--tester_arguments', type=str, default='', help='additional arguments for the tester')
     parser.add_argument('-b', '--benchmark', type=str, default=None, help='benchmark res file to test against')
     parser.add_argument('-s', '--show', action='store_true', help='shows current results') 
-    parser.add_argument('--tc-tester', default=None, choices=['old','new','newrt'], help='type of tc tester, refer to config file for more information')
+    parser.add_argument('--platform', default=None, choices=['tc','old_tc','atcoder'], help='test for which platform, one of [tc, old_tc, atcoder]')
     parser.add_argument('--new-config', action='store_true', help='creates a new config in the current directory (using default one)')
     parser.add_argument('--update-config', action='store_true', help='updates default config')
     parser.add_argument('--restore-config', action='store_true', help='restores default config to the original one')
@@ -330,7 +346,7 @@ def _main():
             "The easiest way to resolve the problem is to manually update your config file with changes introduced in the new version (create a new config file with --new-config)",
             "Alternatively, you can downgrade your version of mmtester to match the config file"])
     
-    # XXX: probably there's a better to do this
+    # XXX: probably there's a better way to do this
     def convert(value, type=str):
         if value is None or value == '':
             return None
@@ -344,7 +360,7 @@ def _main():
     args.exec = args.exec or convert(cfg['default']['exec'], str)
     args.progress = args.progress or convert(cfg['default']['progress'], bool)
     args.benchmark = args.benchmark or convert(cfg['default']['benchmark'])
-    args.tc_tester = args.tc_tester or cfg['default']['tc_tester']
+    args.platform = args.platform or cfg['default']['platform']
     args.tester_arguments = args.tester_arguments or cfg['default']['tester_arguments'] 
     args.data = args.data or cfg['default']['data']
     args.scale = args.scale or convert(cfg['default']['scale'], float)
@@ -382,7 +398,6 @@ def _main():
                     print(prefix if i == 0 else ' ' * len(prefix), line)
                     print(line, file=f)
         sys.exit(0)
-    
     
     # Mode: Find
     if args.find:
@@ -456,7 +471,6 @@ def _main():
         show_summary(results, tests=args.tests, data=data_file, groups=args.groups, filters=args.filters)
         sys.exit(0)
 
-
     # Mode: Run tests
     if not os.path.exists(cfg['general']['tests_dir']):
         os.mkdir(cfg['general']['tests_dir'])
@@ -464,21 +478,43 @@ def _main():
     if not args.tests:
         fatal_error('You need to specify tests to run, use --tests option')
     
+    assert args.platform
     assert args.threads_no >= 1
     fout = sys.stdout
     if args.name:
-        if not os.path.exists(cfg["general"]["results_dir"]):
-            os.makedirs(cfg["general"]["results_dir"], exist_ok=True)
-    
+        os.makedirs(cfg["general"]["results_dir"], exist_ok=True)
         fout = open(f'{cfg["general"]["results_dir"]}/{args.name}{cfg["general"]["results_ext"]}', 'w')
         
-    #TODO: add errors handling/warnings for benchmark file (file not existing, no full test coverage)
+    inputs_path = {}
+    if args.platform == 'atcoder':
+        # generate input files 
+        print('Generating test cases...', file=sys.stderr)
+        gen_seeds = []
+        if cfg['general']['atcoder_gen_cache'].lower() == 'true':
+            os.makedirs('inputs', exist_ok=True)
+            inputs_path = {seed: f'inputs/{seed}.in' for seed in args.tests}
+            present_inputs = set([path for path in os.listdir('inputs') if os.path.isfile(f'inputs/{path}')])
+            gen_seeds = [seed for seed in args.tests if f'{seed}.in' not in present_inputs]
+        else:
+            inputs_path = {seed: f'in/{i:04d}.txt' for i, seed in enumerate(args.tests)}
+            gen_seeds = args.tests
+            
+        if gen_seeds:
+            seeds_path = 'mmtester_seeds.txt'
+            with open(seeds_path, 'w') as f:
+                f.write('\n'.join([str(seed) for seed in gen_seeds]))
+            subprocess.run(f'{cfg["general"]["atcoder_gen_cmd"]} {seeds_path}', shell=True)
+            if cfg['general']['atcoder_gen_cache'].lower() == 'true':
+                for i, seed in enumerate(gen_seeds):
+                    shutil.copy(f'in/{i:04d}.txt', f'inputs/{seed}.in')
+        
+    #TODO: add error handling/warning for benchmark file (file not existing, no full test coverage)
     benchmark = load_res_file(args.benchmark + cfg['general']['results_ext']) if args.benchmark else None
     
     try:
         start_time = time.time()
         for id in args.tests:
-            tests_queue.put(id)
+            tests_queue.put({'seed': id, 'path': inputs_path.get(id, None)})
         tests_left = args.tests
         
         def worker_loop():
