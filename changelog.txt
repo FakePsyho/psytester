@@ -1,6 +1,7 @@
 [0.4.0]
 * added support atcoder heuristic contests
 * new & improved documentation
+* added support for multiple config files; --XXX-config replaced with --config-XXX commands
 * renamed/added bunch of cfg options to accommodate for atcoder support
 [0.3.0]
 * added --generate-scripts (initial support, format might change in the future)

@@ -300,9 +300,10 @@ def _main():
     parser.add_argument('-b', '--benchmark', type=str, default=None, help='benchmark res file to test against')
     parser.add_argument('-s', '--show', action='store_true', help='shows current results') 
     parser.add_argument('--platform', default=None, choices=['tc','old_tc','atcoder'], help='test for which platform, one of [tc, old_tc, atcoder]')
-    parser.add_argument('--new-config', action='store_true', help='creates a new config in the current directory (using default one)')
-    parser.add_argument('--update-config', action='store_true', help='updates default config')
-    parser.add_argument('--restore-config', action='store_true', help='restores default config to the original one')
+    parser.add_argument('--config-load', type=str, help='creates a new config based on specified template config')
+    parser.add_argument('--config-save', type=str, help='updates a template config with local config')
+    parser.add_argument('--config-delete', type=str, help='permanently deletes stored template config')
+    parser.add_argument('--config-list', action='store_true', help='lists available template configs')
     parser.add_argument('--data', type=str, default=None, help='file with metadata, used for grouping and filtering; in order to always use latest results file set it to LATEST') 
     parser.add_argument('--filters', type=str, default=None, nargs='+', help='filters results based on criteria') 
     parser.add_argument('--groups', type=str, default=None, nargs='+', help='groups results into different groups based on criteria') 
@@ -316,26 +317,47 @@ def _main():
     
     args = parser.parse_args()
     
-    if args.new_config:
+    if args.config_load:
+        args.config_load += '.cfg'
+        template_config = os.path.join(os.path.dirname(__file__), args.config_load)
+        if not os.path.exists(template_config):
+            fatal_error(f'Missing {args.config_load} template config file')
         if os.path.exists(args.config):
             fatal_error(f'Config file {args.config} already exists')
         print(f'Creating new config file at {args.config}')
-        shutil.copy(os.path.join(os.path.dirname(__file__), 'tester.cfg'), os.path.join(os.getcwd(), args.config))
+        shutil.copy(template_config, os.path.join(os.getcwd(), args.config))
         sys.exit(0)
         
-    if args.update_config:
+    if args.config_save:
+        args.config_save += '.cfg'
+        template_config = os.path.join(os.path.dirname(__file__), args.config_save)
         assert os.path.exists(args.config)
-        print(f'Updating default config with {args.config}')
-        shutil.copy(os.path.join(os.getcwd(), args.config), os.path.join(os.path.dirname(__file__), 'tester.cfg'))
+        print(f'Updating {args.config_save} template config with {args.config}')
+        # if os.path.exists(template_config):
+            # print('Template config file {args.config_save} already exists, do you wish to overwrite it?')
+        shutil.copy(os.path.join(os.getcwd(), args.config), template_config)
         sys.exit(0)
         
-    if args.restore_config:
-        print('Restoring default config to original state')
-        shutil.copy(os.path.join(os.path.dirname(__file__), 'backup.cfg'), os.path.join(os.path.dirname(__file__), 'tester.cfg'))
+    if args.config_delete:
+        args.config_delete += '.cfg'
+        template_config = os.path.join(os.path.dirname(__file__), args.config_delete)
+        if not os.path.exists(template_config):
+            fatal_error(f'Missing {args.config_delete} template config file')
+        print(f'Removing template config file {args.config_delete}')
+        os.remove(template_config)
         sys.exit(0)
-    
-    if not os.path.exists(args.config):
-        fatal_error(f'Cannot locate config file at {args.config}. Run mmtester --new-config to create a new config file') 
+        
+    if args.config_list:
+        template_configs = glob.glob(f'{os.path.dirname(__file__)}/*.cfg')
+        table = []
+        for template_config in template_configs:
+            cfg = configparser.ConfigParser()
+            cfg.read(template_config)
+            print(cfg['general']['description'])
+            table += [[os.path.splitext(os.path.basename(template_config))[0], cfg['general']['description']]]
+        print('Available template config files:')
+        print(tabulate.tabulate(table, headers=['name', 'description']))
+        sys.exit(0)
         
     cfg = configparser.ConfigParser()
     cfg.read(args.config)
@@ -367,7 +389,7 @@ def _main():
     args.scoring = args.scoring or convert(cfg['default']['scoring'])
     args.sorting = args.sorting or convert(cfg['default']['sorting'])
     
-    
+    # Mode: Generate Scripts
     if args.generate_scripts:
         print('Generating Scripts')
         for script_name in cfg['scripts']:
