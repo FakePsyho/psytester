@@ -47,7 +47,7 @@ Install the latest version with `pip install mmtester --upgrade`
 - By default results are sorted by file name, you can also sort based on time by changing config option `default/sorting` to `date`
 - There are config options to enable/disable showing errors/bests/uniques
 - If you want to remove some old results file the easiest way is to just move/delete them
-- You can use `--groups ...` to add additional columns that will show the score per group; Similarly you can use `--filters ...`. Both of those options require adding metadata by adding `[DATA] variable = value` to your output files. For more info check [grouping and filtering](https://github.com/FakePsyho/mmtester/edit/main/ReadMe.md##grouping-and-filtering)
+- You can use `--groups ...` to add additional columns that will show the score per group; Similarly you can use `--filters ...`. Both of those options require adding metadata by adding `[DATA] variable = value` to your output files. For more info check [grouping and filtering](https://github.com/FakePsyho/mmtester/#grouping-and-filtering)
 - *More info coming*
 
 ## Mode: Find
