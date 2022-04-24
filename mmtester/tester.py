@@ -11,15 +11,13 @@
 # -add warnings if data is not present for all test cases?
 # -config: merge subgroups (you need at least one?)
 # -fix double printing progress bug
-# -add option to generate scripts (c/r/v/s/n -- should be OS-dependent?)
 #  -above + customization of scripts in the config
 # -mode show simple histogram for stats
-# -add atcoder support
 # -test functionality for atcoder
 # -double check that topcoder functional is not broken
-# -find a way to make atcoder score consistent with local (score_mul parameter?)
-# -implement atcoder_gen_cache (temp folder?)
-# -add support for multiple configs via --new-config / --restore-config
+# -find a way to make atcoder score consistent with local (score_mul parameter? / is it needed?)
+# -add option to print parsed commands (or maybe just print when encountered an error?)
+# -add an option for custom scoreboard ordering? (would simply show_XXX options)
 
 # LOW PRIORITY:
 # -add a future proof mechanism for missing lines in config files? (will happen if someones updates the tester but the config file will stay the same)
@@ -34,11 +32,12 @@
 # -simplify parameters in config (some parameters are redundant)
 # -add autodetect for atcoder run/gen cmd (should be easy if files have original names)
 # -add some lock against running atcoder's gen multiple times at the same time
+# -improve script generation?
 
 # ???:
 # -show: add transpose?
 # -is it possible to monitor cpu% and issue warning (too many threads); useful for running on cloud with tons of threads
-# -add html export for --show?
+# -add html export option for --show?
 # -add comments to code (explaining functions should be enough)
 # -add more annotations to functions
 
@@ -105,23 +104,24 @@ def run_test(test) -> Dict:
     
     output_dir = cfg["general"]["tests_dir"] + (f'/{run_dir}' if cfg["general"]["merge_output_dirs"].lower() == "false" else '')
     
-    stdout_path = f'{output_dir}/{seed}.out'
-    stderr_path = f'{output_dir}/{seed}.err'
     os.makedirs(output_dir, exist_ok=True)
     
-    output_files = []
-    cmd = ''
+    def parse_cmd(s):
+        s = s.replace('%SEED%', str(seed))
+        for i in range(1, 10):
+            s = s.replace(f'%SEED0{i}%', f'{seed:0{i}}')
+        s = s.replace('%OUTPUT_DIR%', output_dir)
+        s = s.replace('%TESTER_ARGS%', args.tester_arguments)
+        if '%GEN_INPUT%' in s:
+            s = s.replace('%GEN_INPUT%', str(test['path']))
+        return s
     
-    if args.platform == 'old_tc':
-        cmd = f'{cfg["general"]["tc_run_cmd"]} {cfg["general"]["tc_run_no_vis"]} -exec "{args.exec}" -seed {seed} {args.tester_arguments} > {stdout_path}'
-        output_files = [stdout_path]
-    elif args.platform == 'tc':
-        cmd = f'{cfg["general"]["tc_run_cmd"]} {cfg["general"]["tc_run_no_vis"]} -saveSolError {output_dir} -no -pr -exec "{args.exec}" -seed {seed} {args.tester_arguments} > {stdout_path}'
-        output_files = [stdout_path, stderr_path]
-    elif args.platform == 'atcoder':
-        cmd = f'{cfg["general"]["atcoder_run_cmd"]} "{args.exec}" < {test["path"]} > {stdout_path} 2> {stderr_path}'
-        output_files = [stdout_path, stderr_path]
-        
+    cmd = parse_cmd(cfg['general']['cmd_tester'])
+    output_files = [parse_cmd(s) for s in cfg['general']['output_files'].split(',')]
+    
+    # print(cmd)
+    # print(output_files)
+    
     subprocess.run(cmd, shell=True)
     rv = {'id': seed}
     for output_file in output_files:
@@ -289,17 +289,15 @@ def _main():
     global args
     global cfg
 
-    parser = argparse.ArgumentParser(description='Tester for Marathon Matches')
+    parser = argparse.ArgumentParser(description='Local tester for Topcoder Marathons & AtCoder Heuristic Contests\nMore help available at https://github.com/FakePsyho/mmtester')
     parser.add_argument('name', type=str, nargs='?', default=None, help='name of the run') 
     parser.add_argument('-c', '--config', type=str, default=DEFAULT_CONFIG_PATH, help='path to cfg file')
     parser.add_argument('-t', '--tests', type=str, help='number of tests to run, range of seeds (e.g. A-B) or the name of the JSON/text file with the list of seeds')
     parser.add_argument('-m', '--threads_no', type=int, help='number of threads to use') 
-    parser.add_argument('-e', '--exec', type=str, default=None, help='executable for the tester') 
     parser.add_argument('-p', '--progress', action='store_true', help='shows current progress when testing') 
     parser.add_argument('-a', '--tester_arguments', type=str, default='', help='additional arguments for the tester')
     parser.add_argument('-b', '--benchmark', type=str, default=None, help='benchmark res file to test against')
     parser.add_argument('-s', '--show', action='store_true', help='shows current results') 
-    parser.add_argument('--platform', default=None, choices=['tc','old_tc','atcoder'], help='test for which platform, one of [tc, old_tc, atcoder]')
     parser.add_argument('--config-load', type=str, help='creates a new config based on specified template config')
     parser.add_argument('--config-save', type=str, help='updates a template config with local config')
     parser.add_argument('--config-delete', type=str, help='permanently deletes stored template config')
@@ -353,13 +351,16 @@ def _main():
         for template_config in template_configs:
             cfg = configparser.ConfigParser()
             cfg.read(template_config)
-            print(cfg['general']['description'])
             table += [[os.path.splitext(os.path.basename(template_config))[0], cfg['general']['description']]]
         print('Available template config files:')
         print(tabulate.tabulate(table, headers=['name', 'description']))
         sys.exit(0)
         
-    cfg = configparser.ConfigParser()
+    if not os.path.exists(args.config):
+        fatal_error([f"Missing config file {args.config}, either use correct config file with \"mmtester -c config_file\" or create a new config file with \"mmtester --config-load config_template\"",
+            "If you don't know how to use mmtester, please check out the github project readme at: https://github.com/FakePsyho/mmtester"])
+    
+    cfg = configparser.ConfigParser(interpolation=None)
     cfg.read(args.config)
     
     if cfg['general']['version'] != __version__:
@@ -379,10 +380,8 @@ def _main():
         
     args.tests = try_str_to_numeric(args.tests or convert(cfg['default']['tests']))
     args.threads_no = args.threads_no or convert(cfg['default']['threads_no'], int)
-    args.exec = args.exec or convert(cfg['default']['exec'], str)
     args.progress = args.progress or convert(cfg['default']['progress'], bool)
     args.benchmark = args.benchmark or convert(cfg['default']['benchmark'])
-    args.platform = args.platform or cfg['default']['platform']
     args.tester_arguments = args.tester_arguments or cfg['default']['tester_arguments'] 
     args.data = args.data or cfg['default']['data']
     args.scale = args.scale or convert(cfg['default']['scale'], float)
@@ -391,19 +390,28 @@ def _main():
     
     # Mode: Generate Scripts
     if args.generate_scripts:
+        print('Functionality temporarily disable')
+        sys.exit(0)
         print('Generating Scripts')
         for script_name in cfg['scripts']:
             script = cfg.get('scripts', script_name, raw=True)
             undefined = []
+            
             if '%RUN_CMD%' in script:
                 script = script.replace('%RUN_CMD%', cfg['general']['run_cmd'])
+                
             if '%EXEC%' in script:
-                script = script.replace('%EXEC%', args.exec)
+                if not args.exec:
+                    undefined.append('missing %ECEC% (use --exec EXEC)')
+                else:
+                    script = script.replace('%EXEC%', args.exec)
+                    
             if '%IP%' in script:
                 if not args.ip:
                     undefined.append('missing %IP% (use --ip IP)')
                 else:
                     script = script.replace('%IP%', args.ip)
+                    
             if '%SOURCE%' in script:
                 if not args.source:
                     undefined.append('missing %SOURCE% (use --source SOURCE)')
@@ -500,7 +508,6 @@ def _main():
     if not args.tests:
         fatal_error('You need to specify tests to run, use --tests option')
     
-    assert args.platform
     assert args.threads_no >= 1
     fout = sys.stdout
     if args.name:
@@ -508,11 +515,11 @@ def _main():
         fout = open(f'{cfg["general"]["results_dir"]}/{args.name}{cfg["general"]["results_ext"]}', 'w')
         
     inputs_path = {}
-    if args.platform == 'atcoder':
+    if cfg["general"]["cmd_generator"]:
         # generate input files 
         print('Generating test cases...', file=sys.stderr)
         gen_seeds = []
-        if cfg['general']['atcoder_gen_cache'].lower() == 'true':
+        if cfg['general']['generator_cache'].lower() == 'true':
             os.makedirs('inputs', exist_ok=True)
             inputs_path = {seed: f'inputs/{seed}.in' for seed in args.tests}
             present_inputs = set([path for path in os.listdir('inputs') if os.path.isfile(f'inputs/{path}')])
@@ -525,8 +532,8 @@ def _main():
             seeds_path = 'mmtester_seeds.txt'
             with open(seeds_path, 'w') as f:
                 f.write('\n'.join([str(seed) for seed in gen_seeds]))
-            subprocess.run(f'{cfg["general"]["atcoder_gen_cmd"]} {seeds_path}', shell=True)
-            if cfg['general']['atcoder_gen_cache'].lower() == 'true':
+            subprocess.run(f'{cfg["general"]["cmd_generator"]} {seeds_path}', shell=True)
+            if cfg['general']['generator_cache'].lower() == 'true':
                 for i, seed in enumerate(gen_seeds):
                     shutil.copy(f'in/{i:04d}.txt', f'inputs/{seed}.in')
         

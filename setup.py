@@ -3,13 +3,13 @@ from setuptools import setup
 setup(
     name = 'mmtester',
     packages = ['mmtester'],
-    package_data = {'mmtester': ['tester.cfg', 'backup.cfg']},
+    package_data = {'mmtester': ['topcoder.cfg', 'old_topcoder.cfg', 'atcoder.cfg']},
     version = __import__('mmtester').__version__,
     license = 'MIT',
-    description = "Simple local tester for Topcoder's Marathon contests.",
+    description = "Local tester for Topcoder Marathons & AtCoder Heuristic Contests",
     author = 'Psyho',
     url = 'https://github.com/FakePsyho/mmtester',
-    keywords = ['Topcoder', 'Marathon', 'Tester'],
+    keywords = ['Topcoder', 'Marathon', 'AtCoder', 'Tester'],
     install_requires=['tabulate'],
     classifiers = [
         'Development Status :: 3 - Alpha',
