@@ -246,11 +246,12 @@ def show_summary(runs: Dict[str, Dict[int, float]], tests: Union[None, List[int]
     total_bests = {run_name: 0 for run_name in runs}
     total_uniques = {run_name: 0 for run_name in runs}
     total_gain = {run_name: 0 for run_name in runs}
+    total_missing = {run_name: 0 for run_name in runs}
     for group_no, group_test in enumerate(group_tests):
         total_scores = {run_name: 0.0 for run_name in runs}
         group_scale = args.scale / max(1, len(group_test)) if args.scale else 1.0
         for test in group_test:
-            scores = process_raw_scores([run_results[test]['score'] for run_results in runs.values()], args.scoring)
+            scores = process_raw_scores([run_results[test].get(args.var, 0) for run_results in runs.values()], args.scoring)
             best_score = max(scores)
             second_best_score = sorted(scores)[-2] if len(scores) > 1 else 0
             unique_best = len([score for score in scores if score == best_score]) == 1
@@ -261,26 +262,37 @@ def show_summary(runs: Dict[str, Dict[int, float]], tests: Union[None, List[int]
                     total_uniques[run_name] += 1 if score == best_score and unique_best else 0
                     total_gain[run_name] += max(0, score - second_best_score) * group_scale
                     total_fails[run_name] += 1 if score <= 0 else 0
+                    total_missing[run_name] += 0 if args.var in runs[run_name][test] else 1
                     
         for i, run_name in enumerate(runs):
             table[i].append(total_scores[run_name] * group_scale)
+            
+    missing = {run_name: v > 0 for run_name, v in total_missing.items()}
+    if all(missing.values()):
+        fatal_error(f'None of the results files contain "{args.var}" variable')
     
-    if cfg['general']['show_bests'].lower() == 'true':
-        headers.append('\nBests')
+    if args.var == 'score':
+        if cfg['general']['show_bests'].lower() == 'true':
+            headers.append('\nBests')
+            for i, run_name in enumerate(runs):
+                table[i].append(total_bests[run_name])
+        if cfg['general']['show_uniques'].lower() == 'true':
+            headers.append('\nUniques')
+            for i, run_name in enumerate(runs):
+                table[i].append(total_uniques[run_name])
+        if cfg['general']['show_gain'].lower() == 'true':
+            headers.append('\nGain')
+            for i, run_name in enumerate(runs):
+                table[i].append(total_gain[run_name])
+        if cfg['general']['autohide_fails'].lower() == 'false' or max(total_fails.values()) > 0:
+            headers.append('\nFails')
+            for i, run_name in enumerate(runs):
+                table[i].append(total_fails[run_name])
+    
+    if any(missing.values()):
+        headers.append('\nMissing')
         for i, run_name in enumerate(runs):
-            table[i].append(total_bests[run_name])
-    if cfg['general']['show_uniques'].lower() == 'true':
-        headers.append('\nUniques')
-        for i, run_name in enumerate(runs):
-            table[i].append(total_uniques[run_name])
-    if cfg['general']['show_gain'].lower() == 'true':
-        headers.append('\nGain')
-        for i, run_name in enumerate(runs):
-            table[i].append(total_gain[run_name])
-    if cfg['general']['autohide_fails'].lower() == 'false' or max(total_fails.values()) > 0:
-        headers.append('\nFails')
-        for i, run_name in enumerate(runs):
-            table[i].append(total_fails[run_name])
+            table[i].append(total_missing[run_name])
         
     if hasattr(tabulate, 'MIN_PADDING'):
         tabulate.MIN_PADDING = 0
@@ -305,6 +317,7 @@ def _main():
     parser.add_argument('--config-delete', type=str, help='permanently deletes stored template config')
     parser.add_argument('--config-list', action='store_true', help='lists available template configs')
     parser.add_argument('--data', type=str, default=None, help='file with metadata, used for grouping and filtering; in order to always use latest results file set it to LATEST') 
+    parser.add_argument('--var', type=str, default='score', help='name of the variable you want to visualize (instead of score)')
     parser.add_argument('--filters', type=str, default=None, nargs='+', help='filters results based on criteria') 
     parser.add_argument('--groups', type=str, default=None, nargs='+', help='groups results into different groups based on criteria') 
     parser.add_argument('--scale', type=float, help='sets scaling of results') 
