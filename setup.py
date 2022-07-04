@@ -1,10 +1,11 @@
 from setuptools import setup
+from mmtester.tester import __version__
 
 setup(
     name = 'mmtester',
     packages = ['mmtester'],
     package_data = {'mmtester': ['topcoder.cfg', 'old_topcoder.cfg', 'atcoder.cfg']},
-    version = __import__('mmtester').__version__,
+    version = __version__,
     license = 'MIT',
     description = "Local tester for Topcoder Marathons & AtCoder Heuristic Contests",
     author = 'Psyho',

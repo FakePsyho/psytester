@@ -41,6 +41,7 @@
 # -add comments to code (explaining functions should be enough)
 # -add more annotations to functions
 
+__version__ = '0.4.1'
 
 import tabulate
 import re
@@ -59,8 +60,6 @@ import _thread
 from typing import List, Dict, Union
 import queue
 from threading import Thread
-
-from . import __version__
 
 args = None
 cfg = None
@@ -141,6 +140,7 @@ def run_test(test) -> Dict:
                 
     if 'score' not in rv:
         print(f'\r[Error] Seed: {seed} cointains no score')
+        
         
     return rv
     
@@ -288,7 +288,7 @@ def show_summary(runs: Dict[str, Dict[int, float]], tests: Union[None, List[int]
 def _main():
     global args
     global cfg
-
+    
     parser = argparse.ArgumentParser(description='Local tester for Topcoder Marathons & AtCoder Heuristic Contests\nMore help available at https://github.com/FakePsyho/mmtester')
     parser.add_argument('name', type=str, nargs='?', default=None, help='name of the run') 
     parser.add_argument('-c', '--config', type=str, default=DEFAULT_CONFIG_PATH, help='path to cfg file')
