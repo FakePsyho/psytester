@@ -8,17 +8,13 @@
 # -create proper ReadMe
 # -more error checking / clearer error messages
 # -fix grouping/filtering if data file doesn't contain all test cases
-# -add warnings if data is not present for all test cases?
 # -config: merge subgroups (you need at least one?)
 # -fix double printing progress bug
 #  -above + customization of scripts in the config
 # -mode show simple histogram for stats
-# -test functionality for atcoder
-# -double check that topcoder functional is not broken
 # -find a way to make atcoder score consistent with local (score_mul parameter? / is it needed?)
 # -add option to print parsed commands (or maybe just print when encountered an error?)
 # -add an option for custom scoreboard ordering? (would simply show_XXX options)
-# -show: add option for visualizing different variable
 # -add configurable way of extracting the score (via regex in config)
 
 # LOW PRIORITY:
@@ -320,7 +316,8 @@ def _main():
     parser.add_argument('--var', type=str, default='score', help='name of the variable you want to visualize (instead of score)')
     parser.add_argument('--filters', type=str, default=None, nargs='+', help='filters results based on criteria') 
     parser.add_argument('--groups', type=str, default=None, nargs='+', help='groups results into different groups based on criteria') 
-    parser.add_argument('--scale', type=float, help='sets scaling of results') 
+    parser.add_argument('--scale', type=float, default=None, help='sets scaling of results') 
+    parser.add_argument('--noscale', action='store_true', help='turns off the scaling') 
     parser.add_argument('--scoring', type=str, default=None, help='sets the scoring function used for calculating ranking')
     parser.add_argument('--sorting', type=str, default=None, choices=['name', 'date'], help='sets how the show runs are sorted')
     parser.add_argument('--find', type=str, default=None, nargs='+', help='usage: --find res_file var[+/-] [limit]; sorts tests by var (asceding / descending) and prints seeds; can be combined with --filters; you can use LATEST for res_file')
@@ -402,6 +399,8 @@ def _main():
     args.scale = args.scale or convert(cfg['default']['scale'], float)
     args.scoring = args.scoring or convert(cfg['default']['scoring'])
     args.sorting = args.sorting or convert(cfg['default']['sorting'])
+    if args.noscale:
+        args.scale = None
     
     # Mode: Generate Scripts
     if args.generate_scripts:
