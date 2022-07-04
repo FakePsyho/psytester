@@ -18,6 +18,8 @@
 # -find a way to make atcoder score consistent with local (score_mul parameter? / is it needed?)
 # -add option to print parsed commands (or maybe just print when encountered an error?)
 # -add an option for custom scoreboard ordering? (would simply show_XXX options)
+# -show: add option for visualizing different variable
+# -add configurable way of extracting the score (via regex in config)
 
 # LOW PRIORITY:
 # -add a future proof mechanism for missing lines in config files? (will happen if someones updates the tester but the config file will stay the same)
@@ -492,7 +494,7 @@ def _main():
         elif args.sorting == 'date':
             results_files = [result_file for _, result_file in sorted(zip([os.path.getmtime(result_file) for result_file in results_files], results_files))]
             
-        results = {os.path.basename(file).split('.')[0]: load_res_file(file) for file in results_files}
+        results = {os.path.splitext(os.path.basename(file))[0]: load_res_file(file) for file in results_files}
         
         if args.data == 'LATEST':
             _, args.data = sorted(zip([os.path.getmtime(result_file) for result_file in results_files], results_files))[-1]
