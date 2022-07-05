@@ -15,7 +15,8 @@
 # -find a way to make atcoder score consistent with local (score_mul parameter? / is it needed?)
 # -add option to print parsed commands (or maybe just print when encountered an error?)
 # -add an option for custom scoreboard ordering? (would simply show_XXX options)
-# -add configurable way of extracting the score (via regex in config)
+# -exec: add verbose/debug option that prints a lot of additional stuff in order to make debugging easier
+# -add simple automated unit tests (load config, run tests and check if output is as intended)
 
 # LOW PRIORITY:
 # -add a future proof mechanism for missing lines in config files? (will happen if someones updates the tester but the config file will stay the same)
@@ -55,12 +56,14 @@ import configparser
 import shutil
 import traceback
 import _thread
+import regex
 from typing import List, Dict, Union
 import queue
 from threading import Thread
 
 args = None
 cfg = None
+patterns = []
 
 DEFAULT_CONFIG_PATH = 'tester.cfg'
 
@@ -116,23 +119,22 @@ def run_test(test) -> Dict:
     cmd = parse_cmd(cfg['general']['cmd_tester'])
     output_files = [parse_cmd(s) for s in cfg['general']['output_files'].split(',')]
     
-    # print(cmd)
-    # print(output_files)
-    
     subprocess.run(cmd, shell=True)
     rv = {'id': seed}
+    
     for output_file in output_files:
         with open(output_file) as f:
             for line in f:
-                # XXX: maybe change to regex if they aren't much slower
-                tokens = line.split()
-                if len(tokens) == 3 and tokens[0] == 'Score' and tokens[1] == '=':
-                    rv['score'] = float(tokens[2])
-                if len(tokens) == 7 and tokens[0] == 'Score' and tokens[1] == '=' and tokens[3] == 'RunTime' and tokens[4] == '=' and tokens[6] == 'ms':
-                    rv['score'] = float(tokens[2][:-1])
-                    rv['time'] = float(tokens[5])
-                if len(tokens) == 4 and tokens[0] == '[DATA]' and tokens[2] == '=':
-                    rv[tokens[1]] = try_str_to_numeric(tokens[3])
+                for pattern in patterns:
+                    m = re.match(pattern, line)
+                    if m: 
+                        m = m.groupdict()
+                        if 'VARIABLE' in m and 'VALUE' in m:
+                            m[m['VARIABLE']] = m['VALUE']
+                            del m['VARIABLE']
+                            del m['VALUE']
+                        rv.update({k: try_str_to_numeric(v) for k, v in m.items()})
+                    
         if cfg['general']['keep_output_files'].lower() != 'true':
             os.remove(output_file)
                 
@@ -553,6 +555,13 @@ def _main():
         
     #TODO: add error handling/warning for benchmark file (file not existing, no full test coverage)
     benchmark = load_res_file(args.benchmark + cfg['general']['results_ext']) if args.benchmark else None
+    
+    global patterns
+    for s in cfg['general']:
+        if (s.startswith('extraction_regex_')):
+            patterns.append(cfg['general'][s])
+    if not patterns:
+        fatal_error('No extraction patterns specified (introduced in mmtester 0.5.0) - check online documentation')
     
     try:
         start_time = time.time()
