@@ -339,9 +339,9 @@ def _main():
     parser_config = subparsers.add_parser('config', aliases=['c'], help='loads/saves/deletes specified template config')
     parser_config.set_defaults(mode='config')
     config_mode_group = parser_config.add_mutually_exclusive_group(required=True)
-    config_mode_group.add_argument('--load', dest='template', type=str, metavar='TEMPLATE', help='creates a new config based on specified template config')
-    config_mode_group.add_argument('--save', dest='template', type=str, metavar='TEMPLATE', help='updates a template config with local config')
-    config_mode_group.add_argument('--delete', dest='template', type=str, metavar='TEMPLATE', help='permanently deletes stored template config')
+    config_mode_group.add_argument('--load', type=str, metavar='TEMPLATE', help='creates a new config based on specified template config')
+    config_mode_group.add_argument('--save', type=str, metavar='TEMPLATE', help='updates a template config with local config')
+    config_mode_group.add_argument('--delete', type=str, metavar='TEMPLATE', help='permanently deletes stored template config')
     config_mode_group.add_argument('--list', action='store_true', help='lists available template configs')
     
     # parser_generate = subparsers.add_parser('generate', aliases=['g'], help='')
@@ -349,41 +349,41 @@ def _main():
     # parser_generate.add_argument('--ip', type=str, default=None, help='optional argument for --generate-scripts')
     # parser_generate.add_argument('--source', type=str, default=None, help='optional argument for --generate-scripts')
 
-    
     args = parser.parse_args()
     
     if args.mode == 'config':
-        if args.config_mode == 'load':
-            args.template += '.cfg'
-            template_config = os.path.join(os.path.dirname(__file__), args.template)
+        if args.load:
+            template = args.load + '.cfg'
+            template_config = os.path.join(os.path.dirname(__file__), template)
             if not os.path.exists(template_config):
-                fatal_error(f'Missing {args.template} template config file')
+                fatal_error(f'Missing {template} template config file')
             if os.path.exists(args.config):
                 fatal_error(f'Config file {args.config} already exists')
             print(f'Creating new config file at {args.config}')
             shutil.copy(template_config, os.path.join(os.getcwd(), args.config))
             sys.exit(0)
             
-        elif args.config_mode == 'save':
-            args.template += '.cfg'
-            template_config = os.path.join(os.path.dirname(__file__), args.template)
-            assert os.path.exists(args.config)
-            print(f'Updating {args.template} template config with {args.config}')
-            # if os.path.exists(template_config):
-                # print('Template config file {args.config_save} already exists, do you wish to overwrite it?')
+        elif args.save:
+            template = args.save + '.cfg'
+            template_config = os.path.join(os.path.dirname(__file__), template)
+            if os.path.exists(template_config):
+                fatal_error(f'Template config file {args.save} already exists; if you wish to update it, you have to delete it first')
+            if not os.path.exists(args.config):
+                fatal_error(f'Config file {args.config} doesn\'t exist')
+            print(f'Updating {args.save} template config with {args.config}')
             shutil.copy(os.path.join(os.getcwd(), args.config), template_config)
             sys.exit(0)
             
-        elif args.config_mode == 'delete':
-            args.template += '.cfg'
-            template_config = os.path.join(os.path.dirname(__file__), args.template)
+        elif args.delete:
+            template = args.delete + '.cfg'
+            template_config = os.path.join(os.path.dirname(__file__), template)
             if not os.path.exists(template_config):
-                fatal_error(f'Missing {args.template} template config file')
-            print(f'Removing template config file {args.template}')
+                fatal_error(f'Missing {template} template config file')
+            print(f'Removing template config file {template}')
             os.remove(template_config)
             sys.exit(0)
             
-        elif args.config_mode == 'list':
+        elif args.list:
             template_configs = glob.glob(f'{os.path.dirname(__file__)}/*.cfg')
             table = []
             for template_config in template_configs:
@@ -394,11 +394,9 @@ def _main():
             print(tabulate.tabulate(table, headers=['name', 'description']))
             sys.exit(0)
             
-        else:
-            assert false
         
     if not os.path.exists(args.config):
-        fatal_error([f"Missing config file {args.config}, either use correct config file with \"mmtester -c config_file\" or create a new config file with \"mmtester --config-load config_template\"",
+        fatal_error([f"Missing config file {args.config}, either use correct config file with \"mmtester -c config_file\" or create a new one with \"mmtester config --load template\"",
             "If you don't know how to use mmtester, please check out the github project readme at: https://github.com/FakePsyho/mmtester"])
     
     cfg = configparser.ConfigParser(interpolation=None)
@@ -407,7 +405,7 @@ def _main():
     if cfg['general']['version'] != __version__:
         fatal_error([f"{args.config} version ({cfg['general']['version']}) doesn't match the current version of mmtester {__version__}",
             "Unfortunately mmtester is currently not backwards compatible with old config files",
-            "The easiest way to resolve the problem is to manually update your config file with changes introduced in the new version (create a new config file with --new-config)",
+            "The recommended way to resolve this problem is to manually update your config file with changes introduced in the new version (create a new config file with \"mmtester config --load template\")",
             "Alternatively, you can downgrade your version of mmtester to match the config file"])
     
     # XXX: probably there's a better way to do this
