@@ -8,9 +8,6 @@ version = sys.argv[1]
 
 assert re.match('^[0-9]+\.[0-9]+\.[0-9]+', version)
 
-with open('mmtester/__init__.py', 'w') as f:
-    f.write(f"__version__ = '{version}'\n")
-    
 for path in glob.glob('mmtester/*.cfg') + ['mmtester/tester.py']:
     with open(path, 'r') as f:
         lines = f.readlines()
