@@ -211,12 +211,21 @@ def show_summary(runs: Dict[str, Dict[int, float]], tests: Union[None, List[int]
     group_tests.append(tests)
     if groups:
         for group in groups:
+            var = None
+            if '=' in group: var = group.split('=')[0]
+            if '@' in group: var = group.split('@')[0]
+            if '=' not in group and '@' not in group: var = group
+            var_missing = [var not in data[test] for test in tests]
+            if all(var_missing):
+                fatal_error([f'Variable {var} doesn\'t exist in the data file', f'Only the following variables are present: {set().union(*[set(data[test].keys()) for test in tests])}'])
+            if any(var_missing):
+                fatal_error(f'Variable {var} is missing from {sum(var_missing)} out of {len(tests)} tests')
+            
             if '=' in group:
                 group_names.append(group)
                 group_tests.append(apply_filter(tests, data, group))
             elif '@' in group:
-                var, bins = group.split('@')
-                bins = int(bins)
+                bins = int(group.split('@')[1])
                 values = sorted([data[test][var] for test in tests])
                 # XXX: probably there's a better way to split values into bins
                 pos_start = 0
@@ -230,7 +239,6 @@ def show_summary(runs: Dict[str, Dict[int, float]], tests: Union[None, List[int]
                     group_tests.append(apply_filter(tests, data, group_name))
                     pos_start = pos_end
             else:
-                var = group
                 var_set = sorted(set([data[test][var] for test in tests]))
                 for value in var_set:
                     group_names.append(f'{var}={value}')
@@ -301,74 +309,100 @@ def _main():
     global args
     global cfg
     
-    parser = argparse.ArgumentParser(description='Local tester for Topcoder Marathons & AtCoder Heuristic Contests\nMore help available at https://github.com/FakePsyho/mmtester')
-    parser.add_argument('name', type=str, nargs='?', default=None, help='name of the run') 
+    parser = argparse.ArgumentParser(description='Local tester for Topcoder Marathons & AtCoder Heuristic Contests\nMore help available at https://github.com/FakePsyho/mmtester', formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('-c', '--config', type=str, default=DEFAULT_CONFIG_PATH, help='path to cfg file')
-    parser.add_argument('-t', '--tests', type=str, help='number of tests to run, range of seeds (e.g. A-B) or the name of the JSON/text file with the list of seeds')
-    parser.add_argument('-m', '--threads_no', type=int, help='number of threads to use') 
-    parser.add_argument('-p', '--progress', action='store_true', help='shows current progress when testing') 
-    parser.add_argument('-a', '--tester_arguments', type=str, default='', help='additional arguments for the tester')
-    parser.add_argument('-b', '--benchmark', type=str, default=None, help='benchmark res file to test against')
-    parser.add_argument('-s', '--show', action='store_true', help='shows current results') 
-    parser.add_argument('--config-load', type=str, help='creates a new config based on specified template config')
-    parser.add_argument('--config-save', type=str, help='updates a template config with local config')
-    parser.add_argument('--config-delete', type=str, help='permanently deletes stored template config')
-    parser.add_argument('--config-list', action='store_true', help='lists available template configs')
-    parser.add_argument('--data', type=str, default=None, help='file with metadata, used for grouping and filtering; in order to always use latest results file set it to LATEST') 
-    parser.add_argument('--var', type=str, default='score', help='name of the variable you want to visualize (instead of score)')
-    parser.add_argument('--filters', type=str, default=None, nargs='+', help='filters results based on criteria') 
-    parser.add_argument('--groups', type=str, default=None, nargs='+', help='groups results into different groups based on criteria') 
-    parser.add_argument('--scale', type=float, default=None, help='sets scaling of results') 
-    parser.add_argument('--noscale', action='store_true', help='turns off the scaling') 
-    parser.add_argument('--scoring', type=str, default=None, help='sets the scoring function used for calculating ranking')
-    parser.add_argument('--sorting', type=str, default=None, choices=['name', 'date'], help='sets how the show runs are sorted')
-    parser.add_argument('--find', type=str, default=None, nargs='+', help='usage: --find res_file var[+/-] [limit]; sorts tests by var (asceding / descending) and prints seeds; can be combined with --filters; you can use LATEST for res_file')
-    parser.add_argument('--generate-scripts', action='store_true', help='generates scripts defined in the config file')
-    parser.add_argument('--ip', type=str, default=None, help='optional argument for --generate-scripts')
-    parser.add_argument('--source', type=str, default=None, help='optional argument for --generate-scripts')
+    subparsers = parser.add_subparsers(title='modes')
+    
+    parser_args_tests = argparse.ArgumentParser(add_help=False)
+    parser_args_tests.add_argument('-t', '--tests', type=str, help='number of tests to run (seeds 1-N), range of seeds (e.g. A-B) or the name of the JSON/text file with the list of seeds')
+    
+    parser_args_data = argparse.ArgumentParser(add_help=False)
+    parser_args_data.add_argument('--data', type=str, default=None, help='file with metadata, used for grouping and filtering; in order to always use latest results file set it to LATEST') 
+    parser_args_data.add_argument('--filters', type=str, default=None, nargs='+', metavar='FILTER', help='filters results based on the provided criteria in the form of VAR=A-B') 
+
+    parser_run = subparsers.add_parser('run', aliases=['r'], parents=[parser_args_tests], help='runs a batch of tests')
+    parser_run.set_defaults(mode='run')
+    parser_run.add_argument('-m', '--threads_no', type=int, help='number of threads to use') 
+    parser_run.add_argument('-p', '--progress', action='store_true', help='shows current progress when testing') 
+    parser_run.add_argument('-b', '--benchmark', type=str, default=None, help='benchmark res file to test against')
+    parser_run.add_argument('-a', '--tester_arguments', type=str, default='', help='additional arguments for the tester')
+    parser_run.add_argument('name', type=str, nargs='?', default=None, help='name of the run; if not specified the results will be printed to stdout') 
+    
+    parser_show = subparsers.add_parser('show', aliases=['s'], parents=[parser_args_tests, parser_args_data], help='shows current results', formatter_class=argparse.RawTextHelpFormatter)
+    parser_show.set_defaults(mode='show')
+    parser_show.add_argument('--groups', type=str, default=None, nargs='+', metavar='GROUP', help='create additional columns for each group based on the provided criteria\nFormats allowed:\nVAR     - create a single group for each value of VAR\nVAR@N   - create N equal-sized based on VAR\nVar=A-B - create a single group where VAR is within A-B range') 
+    parser_show.add_argument('--var', type=str, default='score', help='name of the variable you want to visualize (instead of score)')
+    parser_show.add_argument('--scoring', type=str, default=None, choices=['raw','min', 'max'], help='sets the scoring function used for calculating ranking')
+    parser_show.add_argument('--sorting', type=str, default=None, choices=['name', 'date'], help='sets how the runs are sorted')
+    parser_show.add_argument('--scale', type=float, default=None, help='sets scaling of results') 
+    parser_show.add_argument('--noscale', action='store_true', help='turns off the scaling; values will be a simple sum over all tests') 
+    
+    parser_find = subparsers.add_parser('find', aliases=['f'],  parents=[parser_args_tests, parser_args_data], help='sorts the results based on specified critieria')
+    parser_find.set_defaults(mode='find')
+    parser_find.add_argument('--var', type=str, default='score', help='name of the variable you want to sort by')
+    parser_find.add_argument('--order', type=str, default='-', choices=['-', '+'], help='whether the tests should be sorted descending ("-") or ascending ("+")')
+    parser_find.add_argument('--limit', type=int, default=None, help='limits the number of tests to print') 
+    
+    parser_config = subparsers.add_parser('config', aliases=['c'], help='loads/saves/deletes specified template config')
+    parser_config.set_defaults(mode='config')
+    config_mode_group = parser_config.add_mutually_exclusive_group(required=True)
+    config_mode_group.add_argument('--load', dest='template', type=str, metavar='TEMPLATE', help='creates a new config based on specified template config')
+    config_mode_group.add_argument('--save', dest='template', type=str, metavar='TEMPLATE', help='updates a template config with local config')
+    config_mode_group.add_argument('--delete', dest='template', type=str, metavar='TEMPLATE', help='permanently deletes stored template config')
+    config_mode_group.add_argument('--list', action='store_true', help='lists available template configs')
+    
+    # parser_generate = subparsers.add_parser('generate', aliases=['g'], help='')
+    # parser_generate.add_argument('--generate-scripts', action='store_true', help='generates scripts defined in the config file')
+    # parser_generate.add_argument('--ip', type=str, default=None, help='optional argument for --generate-scripts')
+    # parser_generate.add_argument('--source', type=str, default=None, help='optional argument for --generate-scripts')
+
     
     args = parser.parse_args()
     
-    if args.config_load:
-        args.config_load += '.cfg'
-        template_config = os.path.join(os.path.dirname(__file__), args.config_load)
-        if not os.path.exists(template_config):
-            fatal_error(f'Missing {args.config_load} template config file')
-        if os.path.exists(args.config):
-            fatal_error(f'Config file {args.config} already exists')
-        print(f'Creating new config file at {args.config}')
-        shutil.copy(template_config, os.path.join(os.getcwd(), args.config))
-        sys.exit(0)
-        
-    if args.config_save:
-        args.config_save += '.cfg'
-        template_config = os.path.join(os.path.dirname(__file__), args.config_save)
-        assert os.path.exists(args.config)
-        print(f'Updating {args.config_save} template config with {args.config}')
-        # if os.path.exists(template_config):
-            # print('Template config file {args.config_save} already exists, do you wish to overwrite it?')
-        shutil.copy(os.path.join(os.getcwd(), args.config), template_config)
-        sys.exit(0)
-        
-    if args.config_delete:
-        args.config_delete += '.cfg'
-        template_config = os.path.join(os.path.dirname(__file__), args.config_delete)
-        if not os.path.exists(template_config):
-            fatal_error(f'Missing {args.config_delete} template config file')
-        print(f'Removing template config file {args.config_delete}')
-        os.remove(template_config)
-        sys.exit(0)
-        
-    if args.config_list:
-        template_configs = glob.glob(f'{os.path.dirname(__file__)}/*.cfg')
-        table = []
-        for template_config in template_configs:
-            cfg = configparser.ConfigParser()
-            cfg.read(template_config)
-            table += [[os.path.splitext(os.path.basename(template_config))[0], cfg['general']['description']]]
-        print('Available template config files:')
-        print(tabulate.tabulate(table, headers=['name', 'description']))
-        sys.exit(0)
+    if args.mode == 'config':
+        if args.config_mode == 'load':
+            args.template += '.cfg'
+            template_config = os.path.join(os.path.dirname(__file__), args.template)
+            if not os.path.exists(template_config):
+                fatal_error(f'Missing {args.template} template config file')
+            if os.path.exists(args.config):
+                fatal_error(f'Config file {args.config} already exists')
+            print(f'Creating new config file at {args.config}')
+            shutil.copy(template_config, os.path.join(os.getcwd(), args.config))
+            sys.exit(0)
+            
+        elif args.config_mode == 'save':
+            args.template += '.cfg'
+            template_config = os.path.join(os.path.dirname(__file__), args.template)
+            assert os.path.exists(args.config)
+            print(f'Updating {args.template} template config with {args.config}')
+            # if os.path.exists(template_config):
+                # print('Template config file {args.config_save} already exists, do you wish to overwrite it?')
+            shutil.copy(os.path.join(os.getcwd(), args.config), template_config)
+            sys.exit(0)
+            
+        elif args.config_mode == 'delete':
+            args.template += '.cfg'
+            template_config = os.path.join(os.path.dirname(__file__), args.template)
+            if not os.path.exists(template_config):
+                fatal_error(f'Missing {args.template} template config file')
+            print(f'Removing template config file {args.template}')
+            os.remove(template_config)
+            sys.exit(0)
+            
+        elif args.config_mode == 'list':
+            template_configs = glob.glob(f'{os.path.dirname(__file__)}/*.cfg')
+            table = []
+            for template_config in template_configs:
+                cfg = configparser.ConfigParser()
+                cfg.read(template_config)
+                table += [[os.path.splitext(os.path.basename(template_config))[0], cfg['general']['description']]]
+            print('Available template config files:')
+            print(tabulate.tabulate(table, headers=['name', 'description']))
+            sys.exit(0)
+            
+        else:
+            assert false
         
     if not os.path.exists(args.config):
         fatal_error([f"Missing config file {args.config}, either use correct config file with \"mmtester -c config_file\" or create a new config file with \"mmtester --config-load config_template\"",
@@ -392,88 +426,72 @@ def _main():
             return value.lower() in ['true', 'yes']
         return type(value)
         
-    args.tests = try_str_to_numeric(args.tests or convert(cfg['default']['tests']))
-    args.threads_no = args.threads_no or convert(cfg['default']['threads_no'], int)
-    args.progress = args.progress or convert(cfg['default']['progress'], bool)
-    args.benchmark = args.benchmark or convert(cfg['default']['benchmark'])
-    args.tester_arguments = args.tester_arguments or cfg['default']['tester_arguments'] 
-    args.data = args.data or cfg['default']['data']
-    args.scale = args.scale or convert(cfg['default']['scale'], float)
-    args.scoring = args.scoring or convert(cfg['default']['scoring'])
-    args.sorting = args.sorting or convert(cfg['default']['sorting'])
-    if args.noscale:
-        args.scale = None
     
-    # Mode: Generate Scripts
-    if args.generate_scripts:
-        print('Functionality temporarily disable')
-        sys.exit(0)
-        print('Generating Scripts')
-        for script_name in cfg['scripts']:
-            script = cfg.get('scripts', script_name, raw=True)
-            undefined = []
+    # Mode: Generate Scripts (currently disable)
+    # if args.mode == 'generate':
+        # print('Generating Scripts')
+        # for script_name in cfg['scripts']:
+            # script = cfg.get('scripts', script_name, raw=True)
+            # undefined = []
             
-            if '%RUN_CMD%' in script:
-                script = script.replace('%RUN_CMD%', cfg['general']['run_cmd'])
+            # if '%RUN_CMD%' in script:
+                # script = script.replace('%RUN_CMD%', cfg['general']['run_cmd'])
                 
-            if '%EXEC%' in script:
-                if not args.exec:
-                    undefined.append('missing %ECEC% (use --exec EXEC)')
-                else:
-                    script = script.replace('%EXEC%', args.exec)
+            # if '%EXEC%' in script:
+                # if not args.exec:
+                    # undefined.append('missing %ECEC% (use --exec EXEC)')
+                # else:
+                    # script = script.replace('%EXEC%', args.exec)
                     
-            if '%IP%' in script:
-                if not args.ip:
-                    undefined.append('missing %IP% (use --ip IP)')
-                else:
-                    script = script.replace('%IP%', args.ip)
+            # if '%IP%' in script:
+                # if not args.ip:
+                    # undefined.append('missing %IP% (use --ip IP)')
+                # else:
+                    # script = script.replace('%IP%', args.ip)
                     
-            if '%SOURCE%' in script:
-                if not args.source:
-                    undefined.append('missing %SOURCE% (use --source SOURCE)')
-                else:
-                    script = script.replace('%SOURCE%', args.source)
+            # if '%SOURCE%' in script:
+                # if not args.source:
+                    # undefined.append('missing %SOURCE% (use --source SOURCE)')
+                # else:
+                    # script = script.replace('%SOURCE%', args.source)
                     
-            if undefined:
-                print(f'Ignoring script {script_name} because of {undefined}')
-                continue
+            # if undefined:
+                # print(f'Ignoring script {script_name} because of {undefined}')
+                # continue
                 
-            with open(script_name, 'w') as f:
-                for i, line in enumerate(script.split('\\n')):
-                    prefix = f'{script_name} ='
-                    print(prefix if i == 0 else ' ' * len(prefix), line)
-                    print(line, file=f)
-        sys.exit(0)
+            # with open(script_name, 'w') as f:
+                # for i, line in enumerate(script.split('\\n')):
+                    # prefix = f'{script_name} ='
+                    # print(prefix if i == 0 else ' ' * len(prefix), line)
+                    # print(line, file=f)
+        # sys.exit(0)
     
     # Mode: Find
-    if args.find:
-        assert len(args.find) in [2, 3]
-        assert args.find[1][-1] in ['-', '+']
-        
-        if args.find[0] == 'LATEST':
+    if args.mode == 'find':
+        args.data = args.data or cfg['default']['data']
+        if args.data == 'LATEST':
             results_files = find_res_files(cfg['general']['results_dir'])
-            _, args.find[0] = sorted(zip([os.path.getmtime(result_file) for result_file in results_files], results_files))[-1]
+            _, args.data = sorted(zip([os.path.getmtime(result_file) for result_file in results_files], results_files))[-1]
         else:
-            args.find[0] += cfg['general']['results_ext']
+            args.data += cfg['general']['results_ext']
         
-        results = load_res_file(args.find[0])
+        results = load_res_file(args.data)
         tests = results.keys()
         for filter in args.filters or []:
             tests = apply_filter(tests, results, filter)
-        var = args.find[1][:-1]
-        ascending = args.find[1][-1] == '+'
+            
+        ordered_tests = [test for _, test in sorted(zip([results[test][args.var] for test in tests], tests), reverse=args.order == '-')]
         
-        ordered_tests = [test for _, test in sorted(zip([results[test][var] for test in tests], tests), reverse=not ascending)]
+        if args.limit:
+            ordered_tests = ordered_tests[:args.limit]
         
-        if len(args.find) == 3:
-            ordered_tests = ordered_tests[:int(args.find[2])]
-        
-        print(f'Finding in {args.find[0]} file')
+        print(f'Finding in {args.data} file')
         for test in ordered_tests:
             print(json.dumps(results[test]))
         sys.exit(0)
         
     # Parse args.tests
+    args.tests = try_str_to_numeric(args.tests or convert(cfg['default']['tests']))
     if args.tests is None:
         pass
     elif isinstance(args.tests, int):
@@ -497,8 +515,15 @@ def _main():
         hi = try_str_to_numeric(hi)
         args.tests = list(range(lo, hi + 1))
     
-    # Mode: Summary 
-    if args.show:
+    # Mode: Show
+    if args.mode == 'show':
+        args.data = args.data or cfg['default']['data']
+        args.scale = args.scale or convert(cfg['default']['scale'], float)
+        if args.noscale:
+            args.scale = None
+        args.scoring = args.scoring or convert(cfg['default']['scoring'])
+        args.sorting = args.sorting or convert(cfg['default']['sorting'])
+        
         results_files = find_res_files(cfg['general']['results_dir'])
         if not results_files:
             fatal_error(f'There are no results files in the results folder: {cfg["general"]["results_dir"]}')
@@ -517,108 +542,114 @@ def _main():
         show_summary(results, tests=args.tests, data=data_file, groups=args.groups, filters=args.filters)
         sys.exit(0)
 
-    # Mode: Run tests
-    if not os.path.exists(cfg['general']['tests_dir']):
-        os.mkdir(cfg['general']['tests_dir'])
+    # Mode: Run
+    if args.mode == 'run':
+        args.threads_no = args.threads_no or convert(cfg['default']['threads_no'], int)
+        args.progress = args.progress or convert(cfg['default']['progress'], bool)
+        args.benchmark = args.benchmark or convert(cfg['default']['benchmark'])
+        args.tester_arguments = args.tester_arguments or cfg['default']['tester_arguments'] 
         
-    if not args.tests:
-        fatal_error('You need to specify tests to run, use --tests option')
-    
-    assert args.threads_no >= 1
-    fout = sys.stdout
-    if args.name:
-        os.makedirs(cfg["general"]["results_dir"], exist_ok=True)
-        fout = open(f'{cfg["general"]["results_dir"]}/{args.name}{cfg["general"]["results_ext"]}', 'w')
-        
-    inputs_path = {}
-    if cfg["general"]["cmd_generator"]:
-        # generate input files 
-        print('Generating test cases...', file=sys.stderr)
-        gen_seeds = []
-        if cfg['general']['generator_cache'].lower() == 'true':
-            os.makedirs('inputs', exist_ok=True)
-            inputs_path = {seed: f'inputs/{seed}.in' for seed in args.tests}
-            present_inputs = set([path for path in os.listdir('inputs') if os.path.isfile(f'inputs/{path}')])
-            gen_seeds = [seed for seed in args.tests if f'{seed}.in' not in present_inputs]
-        else:
-            inputs_path = {seed: f'in/{i:04d}.txt' for i, seed in enumerate(args.tests)}
-            gen_seeds = args.tests
+        if not os.path.exists(cfg['general']['tests_dir']):
+            os.mkdir(cfg['general']['tests_dir'])
             
-        if gen_seeds:
-            seeds_path = 'mmtester_seeds.txt'
-            with open(seeds_path, 'w') as f:
-                f.write('\n'.join([str(seed) for seed in gen_seeds]))
-            subprocess.run(f'{cfg["general"]["cmd_generator"]} {seeds_path}', shell=True)
+        if not args.tests:
+            fatal_error('You need to specify tests to run, use --tests option')
+        
+        assert args.threads_no >= 1
+        fout = sys.stdout
+        if args.name:
+            os.makedirs(cfg["general"]["results_dir"], exist_ok=True)
+            fout = open(f'{cfg["general"]["results_dir"]}/{args.name}{cfg["general"]["results_ext"]}', 'w')
+            
+        inputs_path = {}
+        if cfg["general"]["cmd_generator"]:
+            # generate input files 
+            print('Generating test cases...', file=sys.stderr)
+            gen_seeds = []
             if cfg['general']['generator_cache'].lower() == 'true':
-                for i, seed in enumerate(gen_seeds):
-                    shutil.copy(f'in/{i:04d}.txt', f'inputs/{seed}.in')
+                os.makedirs('inputs', exist_ok=True)
+                inputs_path = {seed: f'inputs/{seed}.in' for seed in args.tests}
+                present_inputs = set([path for path in os.listdir('inputs') if os.path.isfile(f'inputs/{path}')])
+                gen_seeds = [seed for seed in args.tests if f'{seed}.in' not in present_inputs]
+            else:
+                inputs_path = {seed: f'in/{i:04d}.txt' for i, seed in enumerate(args.tests)}
+                gen_seeds = args.tests
+                
+            if gen_seeds:
+                seeds_path = 'mmtester_seeds.txt'
+                with open(seeds_path, 'w') as f:
+                    f.write('\n'.join([str(seed) for seed in gen_seeds]))
+                subprocess.run(f'{cfg["general"]["cmd_generator"]} {seeds_path}', shell=True)
+                if cfg['general']['generator_cache'].lower() == 'true':
+                    for i, seed in enumerate(gen_seeds):
+                        shutil.copy(f'in/{i:04d}.txt', f'inputs/{seed}.in')
+            
+        #TODO: add error handling/warning for benchmark file (file not existing, no full test coverage)
+        benchmark = load_res_file(args.benchmark + cfg['general']['results_ext']) if args.benchmark else None
         
-    #TODO: add error handling/warning for benchmark file (file not existing, no full test coverage)
-    benchmark = load_res_file(args.benchmark + cfg['general']['results_ext']) if args.benchmark else None
-    
-    global patterns
-    for s in cfg['general']:
-        if (s.startswith('extraction_regex_')):
-            patterns.append(cfg['general'][s])
-    if not patterns:
-        fatal_error('No extraction patterns specified (introduced in mmtester 0.5.0) - check online documentation')
-    
-    try:
-        start_time = time.time()
-        for id in args.tests:
-            tests_queue.put({'seed': id, 'path': inputs_path.get(id, None)})
-        tests_left = args.tests
+        global patterns
+        for s in cfg['general']:
+            if (s.startswith('extraction_regex_')):
+                patterns.append(cfg['general'][s])
+        if not patterns:
+            fatal_error('No extraction patterns specified (introduced in mmtester 0.5.0) - check online documentation')
         
-        def worker_loop():
-            while True:
-                try:
-                    seed = tests_queue.get(False)
-                    result = run_test(seed)
-                    results_queue.put(result)
-                except queue.Empty:
-                    return
-                except:
-                    traceback.print_exc()
-                    fatal_error('One of the worker threads encountered an error', exit_main=True);
-        
-        workers = [Thread(target=worker_loop) for _ in range(args.threads_no)]
-        for worker in workers:
-            worker.start()
-        
-        sum_scores = 0
-        log_scores = 0
-        benchmark_log_scores = 0
-        results = {}
-        processed = 0
-        
-        while tests_left:
-            result = results_queue.get()
-            results[result['id']] = result
-            assert result['id'] in tests_left
-            while tests_left and tests_left[0] in results:
-                processed += 1
-                seed = tests_left[0]
-                print(json.dumps(results[seed]), file=fout, flush=True)
-                tests_left = tests_left[1:]
-                sum_scores += results[seed]['score'] if results[seed]['score'] > 0 else 0
-                log_scores += math.log(results[seed]['score']) if results[seed]['score'] > 0 else 0
-                if args.progress and args.name:
-                    output = f'Progress: {processed} / {processed+len(tests_left)}   Time: {time.time() - start_time : .3f}'
-                    if args.benchmark:
-                        benchmark_log_scores += math.log(benchmark[seed]['score'] if benchmark[seed]['score'] > 0 else 0)
-                        output += f'   Scores: {log_scores / processed : .6f} vs {benchmark_log_scores / processed : .6f}'
-                    print(f'\r{output}                       ', end='', file=sys.stderr)
-                    sys.stderr.flush()
-                    time.sleep(0.001)
-    except KeyboardInterrupt:
-        print('\nInterrupted by user', file=sys.stderr)
-        os._exit(1)
-        
-    print(file=sys.stderr)
-        
-    print("Time:", time.time() - start_time, file=sys.stderr)
-    print("Avg Score:", sum_scores / len(results), file=sys.stderr)
-    print("Avg Log Scores:", log_scores / len(results), file=sys.stderr)
+        try:
+            start_time = time.time()
+            for id in args.tests:
+                tests_queue.put({'seed': id, 'path': inputs_path.get(id, None)})
+            tests_left = args.tests
+            
+            def worker_loop():
+                while True:
+                    try:
+                        seed = tests_queue.get(False)
+                        result = run_test(seed)
+                        results_queue.put(result)
+                    except queue.Empty:
+                        return
+                    except:
+                        traceback.print_exc()
+                        fatal_error('One of the worker threads encountered an error', exit_main=True);
+            
+            workers = [Thread(target=worker_loop) for _ in range(args.threads_no)]
+            for worker in workers:
+                worker.start()
+            
+            sum_scores = 0
+            log_scores = 0
+            benchmark_log_scores = 0
+            results = {}
+            processed = 0
+            
+            while tests_left:
+                result = results_queue.get()
+                results[result['id']] = result
+                assert result['id'] in tests_left
+                while tests_left and tests_left[0] in results:
+                    processed += 1
+                    seed = tests_left[0]
+                    print(json.dumps(results[seed]), file=fout, flush=True)
+                    tests_left = tests_left[1:]
+                    sum_scores += results[seed]['score'] if results[seed]['score'] > 0 else 0
+                    log_scores += math.log(results[seed]['score']) if results[seed]['score'] > 0 else 0
+                    if args.progress and args.name:
+                        output = f'Progress: {processed} / {processed+len(tests_left)}   Time: {time.time() - start_time : .3f}'
+                        if args.benchmark:
+                            benchmark_log_scores += math.log(benchmark[seed]['score'] if benchmark[seed]['score'] > 0 else 0)
+                            output += f'   Scores: {log_scores / processed : .6f} vs {benchmark_log_scores / processed : .6f}'
+                        print(f'\r{output}                       ', end='', file=sys.stderr)
+                        sys.stderr.flush()
+                        time.sleep(0.001)
+        except KeyboardInterrupt:
+            print('\nInterrupted by user', file=sys.stderr)
+            os._exit(1)
+            
+        print(file=sys.stderr)
+            
+        print("Time:", time.time() - start_time, file=sys.stderr)
+        print("Avg Score:", sum_scores / len(results), file=sys.stderr)
+        print("Avg Log Scores:", log_scores / len(results), file=sys.stderr)
     
     
 if __name__ == '__main__':

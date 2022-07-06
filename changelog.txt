@@ -1,24 +1,29 @@
 [WIP]
-* --exec: patterns for extracting the score / metadata are converted to regex and are editable in the config files
-* --show: --noscale override to remove scaling from cmd line
-* --show: new option --var VARIABLE in order to show stats for VARIABLE instead of score
-* --show: additional "Missing" column for tests missing score (or a specified variable)
+* complete overhaul of cmd line help
+	* --help will only show the explanation for arguments relevant to your mode (e.g. run, show, find)
+	* help descriptions should be more clear now
+	* some of the commands are invoked differently, most notable run is now "mmtester r ..." instead of "mmtester ..."
+* run: patterns for extracting the score / metadata are converted to regex and are editable in the config files
+* show: new option --var VARIABLE in order to show stats for VARIABLE instead of score
+* show: --noscale override to remove scaling from cmd line
+* show: additional "Missing" column for tests missing score (or a specified variable)
+* tester.py functions as a stand-alone script (if you need changes, you can create local copy of tester.py run it from current directory)
 [0.4.1]
 * separate predefined configs for topcoder/atcoder
 [0.4.0]
-* added support atcoder heuristic contests
+* added support atcoder heuristic contests (AHC)
 * new & improved documentation
 * added support for multiple config files; --XXX-config replaced with --config-XXX commands
 * renamed/added bunch of cfg options to accommodate for atcoder support
 [0.3.0]
 * added --generate-scripts (initial support, format might change in the future)
 [0.2.2]
-* --show: # of bests/uniques/gain for each run (enabled/disabled in config)
-* --show: option for autohiding fails when there are no failed testcases
+* show: # of bests/uniques/gain for each run (enabled/disabled in config)
+* show: option for autohiding fails when there are no failed testcases
 [0.2.1]
 * versioning support (config files store the version of mmtester)
 * --groups: added VAR@N to automatically create N equally-sized bins for VAR variable
-* --show: prints number of tests for each group at the top
+* show: prints number of tests for each group at the top
 * general/merge_output_dirs config option to reduce the number of output files
 * general/precision for custom precision of scores
 [0.2.0]
