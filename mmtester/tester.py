@@ -18,14 +18,11 @@
 # LOW PRIORITY:
 # -add a future proof mechanism for missing lines in config files? (will happen if someones updates the tester but the config file will stay the same)
 # -add option to shorten group names?
-# -use --tests for --find?
 # -add support for custom scoring (cfg would be python code?)
 # -add RUNNER parameters (like for hash code) (Moved to RUNNER?)
 # -sync with RUNNER? (how?)
 # -add cleanup on ctrl+c (what that would be?)
 # -simplify parameters in config (some parameters are redundant)
-# -add autodetect for atcoder run/gen cmd (should be easy if files have original names)?
-# -add some lock against running atcoder's gen multiple times at the same time
 # -improve script generation?
 
 # ???:
@@ -106,8 +103,6 @@ def run_test(test) -> Dict:
             s = s.replace(f'%SEED0{i}%', f'{seed:0{i}}')
         s = s.replace('%OUTPUT_DIR%', output_dir)
         s = s.replace('%TESTER_ARGS%', args.tester_arguments)
-        if '%GEN_INPUT%' in s:
-            s = s.replace('%GEN_INPUT%', str(test['path']))
         return s
     
     cmd = parse_cmd(cfg['general']['cmd_tester'])
@@ -554,29 +549,6 @@ def _main():
             os.makedirs(cfg["general"]["results_dir"], exist_ok=True)
             fout = open(f'{cfg["general"]["results_dir"]}/{args.name}{cfg["general"]["results_ext"]}', 'w')
             
-        inputs_path = {}
-        if cfg["general"]["cmd_generator"]:
-            # generate input files 
-            print('Generating test cases...', file=sys.stderr)
-            gen_seeds = []
-            if cfg['general']['generator_cache'].lower() == 'true':
-                os.makedirs('inputs', exist_ok=True)
-                inputs_path = {seed: f'inputs/{seed}.in' for seed in args.tests}
-                present_inputs = set([path for path in os.listdir('inputs') if os.path.isfile(f'inputs/{path}')])
-                gen_seeds = [seed for seed in args.tests if f'{seed}.in' not in present_inputs]
-            else:
-                inputs_path = {seed: f'in/{i:04d}.txt' for i, seed in enumerate(args.tests)}
-                gen_seeds = args.tests
-                
-            if gen_seeds:
-                seeds_path = 'mmtester_seeds.txt'
-                with open(seeds_path, 'w') as f:
-                    f.write('\n'.join([str(seed) for seed in gen_seeds]))
-                subprocess.run(f'{cfg["general"]["cmd_generator"]} {seeds_path}', shell=True)
-                if cfg['general']['generator_cache'].lower() == 'true':
-                    for i, seed in enumerate(gen_seeds):
-                        shutil.copy(f'in/{i:04d}.txt', f'inputs/{seed}.in')
-            
         global patterns
         for s in cfg['general']:
             if (s.startswith('extraction_regex_')):
@@ -587,7 +559,7 @@ def _main():
         try:
             start_time = time.time()
             for id in args.tests:
-                tests_queue.put({'seed': id, 'path': inputs_path.get(id, None)})
+                tests_queue.put({'seed': id})
             tests_left = args.tests
             
             def worker_loop():

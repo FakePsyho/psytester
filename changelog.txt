@@ -6,6 +6,7 @@
 * run: patterns for extracting the score / metadata are converted to regex and are editable in the config files
 * show: new option --var VARIABLE in order to show stats for VARIABLE instead of score
 * show: --noscale override to remove scaling from cmd line
+* run: removed support for AHC generator; running generator single time manually is always going to be easier than configuring it to work with mmtester
 * show: additional "Missing" column for tests missing score (or a specified variable)
 * find: you can use --tests as a filter 
 * run: removed --benchmark as it was a cumbersome option and was inferior to just running "mmtester show" during the run
