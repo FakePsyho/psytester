@@ -6,13 +6,10 @@
 #TODO:
 # HIGH PRIORITY:
 # -create proper ReadMe
-# -more error checking / clearer error messages
-# -fix grouping/filtering if data file doesn't contain all test cases
 # -config: merge subgroups (you need at least one?)
 # -fix double printing progress bug
 #  -above + customization of scripts in the config
 # -mode show simple histogram for stats
-# -find a way to make atcoder score consistent with local (score_mul parameter? / is it needed?)
 # -add option to print parsed commands (or maybe just print when encountered an error?)
 # -add an option for custom scoreboard ordering? (would simply show_XXX options)
 # -exec: add verbose/debug option that prints a lot of additional stuff in order to make debugging easier
@@ -24,12 +21,10 @@
 # -use --tests for --find?
 # -add support for custom scoring (cfg would be python code?)
 # -add RUNNER parameters (like for hash code) (Moved to RUNNER?)
-# -add batching? (Moved to RUNNER?)
 # -sync with RUNNER? (how?)
 # -add cleanup on ctrl+c (what that would be?)
-# -change to subparsers (exec / show / find?)
 # -simplify parameters in config (some parameters are redundant)
-# -add autodetect for atcoder run/gen cmd (should be easy if files have original names)
+# -add autodetect for atcoder run/gen cmd (should be easy if files have original names)?
 # -add some lock against running atcoder's gen multiple times at the same time
 # -improve script generation?
 
@@ -56,7 +51,6 @@ import configparser
 import shutil
 import traceback
 import _thread
-import regex
 from typing import List, Dict, Union
 import queue
 from threading import Thread
@@ -465,30 +459,6 @@ def _main():
                     # print(line, file=f)
         # sys.exit(0)
     
-    # Mode: Find
-    if args.mode == 'find':
-        args.data = args.data or cfg['default']['data']
-        if args.data == 'LATEST':
-            results_files = find_res_files(cfg['general']['results_dir'])
-            _, args.data = sorted(zip([os.path.getmtime(result_file) for result_file in results_files], results_files))[-1]
-        else:
-            args.data += cfg['general']['results_ext']
-        
-        results = load_res_file(args.data)
-        tests = results.keys()
-        for filter in args.filters or []:
-            tests = apply_filter(tests, results, filter)
-            
-        ordered_tests = [test for _, test in sorted(zip([results[test][args.var] for test in tests], tests), reverse=args.order == '-')]
-        
-        if args.limit:
-            ordered_tests = ordered_tests[:args.limit]
-        
-        print(f'Finding in {args.data} file')
-        for test in ordered_tests:
-            print(json.dumps(results[test]))
-        sys.exit(0)
-        
     # Parse args.tests
     args.tests = try_str_to_numeric(args.tests or convert(cfg['default']['tests']))
     if args.tests is None:
@@ -514,6 +484,33 @@ def _main():
         hi = try_str_to_numeric(hi)
         args.tests = list(range(lo, hi + 1))
     
+    # Mode: Find
+    if args.mode == 'find':
+        args.data = args.data or cfg['default']['data']
+        if args.data == 'LATEST':
+            results_files = find_res_files(cfg['general']['results_dir'])
+            _, args.data = sorted(zip([os.path.getmtime(result_file) for result_file in results_files], results_files))[-1]
+        else:
+            args.data += cfg['general']['results_ext']
+        
+        results = load_res_file(args.data)
+        tests = results.keys()
+        if args.tests:
+            tests = list(set(tests) & set(args.tests))
+        
+        for filter in args.filters or []:
+            tests = apply_filter(tests, results, filter)
+            
+        ordered_tests = [test for _, test in sorted(zip([results[test][args.var] for test in tests], tests), reverse=args.order == '-')]
+        
+        if args.limit:
+            ordered_tests = ordered_tests[:args.limit]
+        
+        print(f'Finding in {args.data} file')
+        for test in ordered_tests:
+            print(json.dumps(results[test]))
+        sys.exit(0)
+        
     # Mode: Show
     if args.mode == 'show':
         args.data = args.data or cfg['default']['data']
