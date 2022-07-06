@@ -324,7 +324,6 @@ def _main():
     parser_run.set_defaults(mode='run')
     parser_run.add_argument('-m', '--threads_no', type=int, help='number of threads to use') 
     parser_run.add_argument('-p', '--progress', action='store_true', help='shows current progress when testing') 
-    parser_run.add_argument('-b', '--benchmark', type=str, default=None, help='benchmark res file to test against')
     parser_run.add_argument('-a', '--tester_arguments', type=str, default='', help='additional arguments for the tester')
     parser_run.add_argument('name', type=str, nargs='?', default=None, help='name of the run; if not specified the results will be printed to stdout') 
     
@@ -546,7 +545,6 @@ def _main():
     if args.mode == 'run':
         args.threads_no = args.threads_no or convert(cfg['default']['threads_no'], int)
         args.progress = args.progress or convert(cfg['default']['progress'], bool)
-        args.benchmark = args.benchmark or convert(cfg['default']['benchmark'])
         args.tester_arguments = args.tester_arguments or cfg['default']['tester_arguments'] 
         
         if not os.path.exists(cfg['general']['tests_dir']):
@@ -584,9 +582,6 @@ def _main():
                     for i, seed in enumerate(gen_seeds):
                         shutil.copy(f'in/{i:04d}.txt', f'inputs/{seed}.in')
             
-        #TODO: add error handling/warning for benchmark file (file not existing, no full test coverage)
-        benchmark = load_res_file(args.benchmark + cfg['general']['results_ext']) if args.benchmark else None
-        
         global patterns
         for s in cfg['general']:
             if (s.startswith('extraction_regex_')):
@@ -618,7 +613,6 @@ def _main():
             
             sum_scores = 0
             log_scores = 0
-            benchmark_log_scores = 0
             results = {}
             processed = 0
             
@@ -635,12 +629,9 @@ def _main():
                     log_scores += math.log(results[seed]['score']) if results[seed]['score'] > 0 else 0
                     if args.progress and args.name:
                         output = f'Progress: {processed} / {processed+len(tests_left)}   Time: {time.time() - start_time : .3f}'
-                        if args.benchmark:
-                            benchmark_log_scores += math.log(benchmark[seed]['score'] if benchmark[seed]['score'] > 0 else 0)
-                            output += f'   Scores: {log_scores / processed : .6f} vs {benchmark_log_scores / processed : .6f}'
                         print(f'\r{output}                       ', end='', file=sys.stderr)
                         sys.stderr.flush()
-                        time.sleep(0.001)
+                        time.sleep(0.002)
         except KeyboardInterrupt:
             print('\nInterrupted by user', file=sys.stderr)
             os._exit(1)

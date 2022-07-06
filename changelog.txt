@@ -7,6 +7,7 @@
 * show: new option --var VARIABLE in order to show stats for VARIABLE instead of score
 * show: --noscale override to remove scaling from cmd line
 * show: additional "Missing" column for tests missing score (or a specified variable)
+* run: removed --benchmark as it was a cumbersome option and was inferior to just running "mmtester show" during the run
 * tester.py functions as a stand-alone script (if you need changes, you can create local copy of tester.py run it from current directory)
 [0.4.1]
 * separate predefined configs for topcoder/atcoder
