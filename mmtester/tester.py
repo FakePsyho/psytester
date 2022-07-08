@@ -89,13 +89,20 @@ def fatal_error(msgs, exit_main=False):
 
 
 def run_test(test) -> Dict:
+
     seed = test['seed']
 
     run_dir = args.name or '_default'
     
     output_dir = cfg["general"]["tests_dir"] + (f'/{run_dir}' if cfg["general"]["merge_output_dirs"].lower() == "false" else '')
+    if args.debug:
+        print()
+        print('Running test:', test)
+        print('Working directory:', output_dir)
     
     os.makedirs(output_dir, exist_ok=True)
+    for file in os.listdir(output_dir):
+        os.remove(os.path.join(output_dir, file))
     
     def parse_cmd(s):
         s = s.replace('%SEED%', str(seed))
@@ -107,29 +114,54 @@ def run_test(test) -> Dict:
     
     cmd = parse_cmd(cfg['general']['cmd_tester'])
     output_files = [parse_cmd(s) for s in cfg['general']['output_files'].split(',')]
+    if args.debug:
+        print('general/cmd_tester')
+        print('Original:', cfg["general"]["cmd_tester"])
+        print('Parsed:', cmd)
+        print('general/output_files')
+        print('Original:', cfg['general']['output_files'])
+        print('Parsed:', output_files)
+        print()
+        print('Executing cmd_tester')
+       
     
-    subprocess.run(cmd, shell=True)
+    start_time = time.time()
+    completed_run = subprocess.run(cmd, shell=True)
     rv = {'id': seed}
     
+    if args.debug:
+        print(f'cmd_tester finished with {completed_run.returncode} return code after {round(time.time() - start_time, 6)} seconds')
+        print()
+        print('Contents of the output files:')
+            
+    
     for output_file in output_files:
+        if args.debug:
+            print(f'File: {output_file}')
+            if not os.path.exists(output_file):
+                fatal_error(f'Output file {output_file} doesn\'t exist; this means either cmd_tester/output_files is incorrectly defined or your tester/solver crashed and didn\'t produce that file', True)
         with open(output_file) as f:
             for line in f:
+                print(line.rstrip())
                 for pattern in patterns:
                     m = re.match(pattern, line)
                     if m: 
+                        if args.debug:
+                            print(f'!!! Successful match with {pattern} pattern')
                         m = m.groupdict()
                         if 'VARIABLE' in m and 'VALUE' in m:
                             m[m['VARIABLE']] = m['VALUE']
                             del m['VARIABLE']
                             del m['VALUE']
                         rv.update({k: try_str_to_numeric(v) for k, v in m.items()})
+                        if args.debug:
+                            print('!!! Extracted dict:', m, 'New dict:', rv)
                     
         if cfg['general']['keep_output_files'].lower() != 'true':
             os.remove(output_file)
                 
     if 'score' not in rv:
         print(f'\r[Error] Seed: {seed} cointains no score')
-        
         
     return rv
     
@@ -313,6 +345,7 @@ def _main():
     parser_run.set_defaults(mode='run')
     parser_run.add_argument('-m', '--threads_no', type=int, help='number of threads to use') 
     parser_run.add_argument('-p', '--progress', action='store_true', help='shows current progress when testing') 
+    parser_run.add_argument('-d', '--debug', action='store_true', help='special verbose mode helpful when figuring out why mmtester doesn\'t work; overrides threads_no to 1')
     parser_run.add_argument('-a', '--tester_arguments', type=str, default='', help='additional arguments for the tester')
     parser_run.add_argument('name', type=str, nargs='?', default=None, help='name of the run; if not specified the results will be printed to stdout') 
     
@@ -536,6 +569,9 @@ def _main():
         args.threads_no = args.threads_no or convert(cfg['default']['threads_no'], int)
         args.progress = args.progress or convert(cfg['default']['progress'], bool)
         args.tester_arguments = args.tester_arguments or cfg['default']['tester_arguments'] 
+        if args.debug:
+            args.threads_no = 1
+            args.progress = False
         
         if not os.path.exists(cfg['general']['tests_dir']):
             os.mkdir(cfg['general']['tests_dir'])
@@ -555,6 +591,11 @@ def _main():
                 patterns.append(cfg['general'][s])
         if not patterns:
             fatal_error('No extraction patterns specified (introduced in mmtester 0.5.0) - check online documentation')
+        if args.debug:
+            print('Extraction patterns found:')
+            for pattern in patterns:
+                print(pattern)
+            print()
         
         try:
             start_time = time.time()
@@ -568,6 +609,8 @@ def _main():
                         seed = tests_queue.get(False)
                         result = run_test(seed)
                         results_queue.put(result)
+                        if args.debug:
+                            time.sleep(0.1)
                     except queue.Empty:
                         return
                     except:

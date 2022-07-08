@@ -1,3 +1,5 @@
+[WIP]
+* run: --debug mode 
 [0.5.0]
 * complete overhaul of cmd line help
 	* --help will only show the explanation for arguments relevant to your mode (e.g. run, show, find)
