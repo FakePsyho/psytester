@@ -32,7 +32,7 @@
 # -add comments to code (explaining functions should be enough)
 # -add more annotations to functions
 
-__version__ = '0.5.0'
+__version__ = '0.5.1'
 
 import tabulate
 import re
