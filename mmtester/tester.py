@@ -225,11 +225,9 @@ def show_summary(runs: Dict[str, Dict[int, float]], tests: Union[None, List[int]
             tests = apply_filter(tests, data, filter)
         print(f'Filtered {initial_tests_no} tests to {len(tests)}')
             
-    group_names = []
-    group_tests = []
+    group_names = ['Overall']
+    group_tests = [tests]
     
-    group_names.append('Score')
-    group_tests.append(tests)
     if groups:
         for group in groups:
             var = None
@@ -264,17 +262,17 @@ def show_summary(runs: Dict[str, Dict[int, float]], tests: Union[None, List[int]
                 for value in var_set:
                     group_names.append(f'{var}={value}')
                     group_tests.append(apply_filter(tests, data, f'{var}={value}'))
+                    
+    columns = {}
+    columns['runs'] = [('Tests\nRun', [run_name for run_name in runs])]
+    columns['groups'] = []
         
-    headers = ['Tests\nRun'] + [f'{len(tests)}\n{name}' for name, tests in zip(group_names, group_tests)]
-        
-    table = [[run_name] for run_name in runs]
-    
     total_fails = {run_name: 0 for run_name in runs}
     total_bests = {run_name: 0 for run_name in runs}
     total_uniques = {run_name: 0 for run_name in runs}
     total_gain = {run_name: 0 for run_name in runs}
     total_missing = {run_name: 0 for run_name in runs}
-    for group_no, group_test in enumerate(group_tests):
+    for group_no, (group_name, group_test) in enumerate(zip(group_names, group_tests)):
         total_scores = {run_name: 0.0 for run_name in runs}
         group_scale = args.scale / max(1, len(group_test)) if args.scale else 1.0
         for test in group_test:
@@ -291,36 +289,39 @@ def show_summary(runs: Dict[str, Dict[int, float]], tests: Union[None, List[int]
                     total_fails[run_name] += 1 if score <= 0 else 0
                     total_missing[run_name] += 0 if args.var in runs[run_name][test] else 1
                     
-        for i, run_name in enumerate(runs):
-            table[i].append(total_scores[run_name] * group_scale)
+        column = (f'{len(group_test)}\n{group_name}', [total_scores[run_name] * group_scale for run_name in runs])
+        if group_no == 0:
+            columns['overall'] = [column]
+        else:
+            columns['groups'].append(column)
             
-    missing = {run_name: v > 0 for run_name, v in total_missing.items()}
-    if all(missing.values()):
+    if all([v > 0 for v in total_missing.values()]):
         fatal_error(f'None of the results files contain "{args.var}" variable')
+     
+    columns['bests'] = [('\nBests', [total_bests[run_name] for run_name in runs])]
+    columns['uniques'] = [('\nUniques', [total_uniques[run_name] for run_name in runs])]
+    columns['gain'] = [('\nGain', [total_gain[run_name] for run_name in runs])]
+    columns['fails'] = [('\nFails', [total_fails[run_name] for run_name in runs])]
+    columns['missing'] = [('\nMissing', [total_missing[run_name] for run_name in runs])]
     
-    if args.var == 'score':
-        if cfg['general']['show_bests'].lower() == 'true':
-            headers.append('\nBests')
-            for i, run_name in enumerate(runs):
-                table[i].append(total_bests[run_name])
-        if cfg['general']['show_uniques'].lower() == 'true':
-            headers.append('\nUniques')
-            for i, run_name in enumerate(runs):
-                table[i].append(total_uniques[run_name])
-        if cfg['general']['show_gain'].lower() == 'true':
-            headers.append('\nGain')
-            for i, run_name in enumerate(runs):
-                table[i].append(total_gain[run_name])
-        if cfg['general']['autohide_fails'].lower() == 'false' or max(total_fails.values()) > 0:
-            headers.append('\nFails')
-            for i, run_name in enumerate(runs):
-                table[i].append(total_fails[run_name])
-    
-    if any(missing.values()):
-        headers.append('\nMissing')
-        for i, run_name in enumerate(runs):
-            table[i].append(total_missing[run_name])
-        
+    leaderboard = cfg['general']['leaderboard_score'] if args.var == 'score' else cfg['general']['leaderboard_custom']
+    leaderboard = 'runs,' + leaderboard
+    headers = []
+    table = []
+    for column_name in leaderboard.split(','):
+        column_name = column_name.lower()
+        optional = False
+        if column_name[-1] == '?':
+            optional = True
+            column_name = column_name[:-1]
+        if column_name not in columns:
+            fatal_error(f'Unknown column name: {column_name}, please correct the leaderboard_XXX option')
+        for column in columns[column_name]:
+            if not optional or any(column[1]):
+                headers.append(column[0])
+                table += [column[1]]
+                
+    table = list(zip(*table))
     if hasattr(tabulate, 'MIN_PADDING'):
         tabulate.MIN_PADDING = 0
     print(tabulate.tabulate(table, headers=headers, floatfmt=f'.{cfg["general"]["precision"]}f'))
