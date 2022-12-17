@@ -6,15 +6,9 @@
 #TODO:
 # HIGH PRIORITY:
 # -create proper ReadMe
-# -config: merge subgroups (you need at least one?)
 # -fix double printing progress bug
-#  -above + customization of scripts in the config
 # -mode show simple histogram for stats
-# -add option to print parsed commands (or maybe just print when encountered an error?)
-# -exec: add verbose/debug option that prints a lot of additional stuff in order to make debugging easier
 # -add simple automated unit tests (load config, run tests and check if output is as intended)
-# -show: add regex argument for results files
-# -show: add directory argument
 
 # LOW PRIORITY:
 # -add a future proof mechanism for missing lines in config files? (will happen if someones updates the tester but the config file will stay the same)
@@ -31,6 +25,7 @@
 # -add html export option for --show?
 # -add comments to code (explaining functions should be enough)
 # -add more annotations to functions
+# -add ML model to figure out best parameters for test type? (this would require embedding prediction model in C++ code, simple MLP model? how to avoid overfitting?)
 
 __version__ = '0.5.1'
 
