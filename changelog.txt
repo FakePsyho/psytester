@@ -1,6 +1,8 @@
-[WIP]
+[0.5.1]
 * run: --debug mode added
 * show: new general/leaderboard replaces general/show_XXX options and allows for custom leaderboard order
+* show: new options for including/excluding specific results files, use --files LIST OF FILES / --xfiles LIST OF FILES respectively; you can use both at the same time
+* show: you can use --dir to specify the directory for the files
 [0.5.0]
 * complete overhaul of cmd line help
 	* --help will only show the explanation for arguments relevant to your mode (e.g. run, show, find)

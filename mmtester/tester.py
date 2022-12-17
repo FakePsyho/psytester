@@ -11,9 +11,10 @@
 #  -above + customization of scripts in the config
 # -mode show simple histogram for stats
 # -add option to print parsed commands (or maybe just print when encountered an error?)
-# -add an option for custom scoreboard ordering? (would simply show_XXX options)
 # -exec: add verbose/debug option that prints a lot of additional stuff in order to make debugging easier
 # -add simple automated unit tests (load config, run tests and check if output is as intended)
+# -show: add regex argument for results files
+# -show: add directory argument
 
 # LOW PRIORITY:
 # -add a future proof mechanism for missing lines in config files? (will happen if someones updates the tester but the config file will stay the same)
@@ -23,7 +24,6 @@
 # -sync with RUNNER? (how?)
 # -add cleanup on ctrl+c (what that would be?)
 # -simplify parameters in config (some parameters are redundant)
-# -improve script generation?
 
 # ???:
 # -show: add transpose?
@@ -101,8 +101,6 @@ def run_test(test) -> Dict:
         print('Working directory:', output_dir)
     
     os.makedirs(output_dir, exist_ok=True)
-    for file in os.listdir(output_dir):
-        os.remove(os.path.join(output_dir, file))
     
     def parse_cmd(s):
         s = s.replace('%SEED%', str(seed))
@@ -142,7 +140,6 @@ def run_test(test) -> Dict:
                 fatal_error(f'Output file {output_file} doesn\'t exist; this means either cmd_tester/output_files is incorrectly defined or your tester/solver crashed and didn\'t produce that file', True)
         with open(output_file) as f:
             for line in f:
-                print(line.rstrip())
                 for pattern in patterns:
                     m = re.match(pattern, line)
                     if m: 
@@ -166,8 +163,26 @@ def run_test(test) -> Dict:
     return rv
     
     
-def find_res_files(dir='.'):
-    return glob.glob(f'{dir}/*{cfg["general"]["results_ext"]}')
+def find_res_files(dir='.', include_patterns=None, exclude_patterns=None):
+    files_list = [path for path in os.listdir(dir) if path.endswith(cfg["general"]["results_ext"])]
+    
+    try:
+        if include_patterns:
+            files_set = set()
+            for pattern in include_patterns:
+                m = re.compile(pattern)
+                for file in files_list:
+                    if m.search(file):
+                        files_set.add(file)
+            files_list = list(files_set)
+        if exclude_patterns:
+            for pattern in exclude_patterns:
+                m = re.compile(pattern)
+                files_list = [file for file in files_list if not m.search(file)]
+    except re.error:
+        fatal_error('Supplied patterns are not valid regexp')
+        
+    return [f'{dir}/{file}' for file in files_list]
     
     
 def load_res_file(path) -> Dict[int, float]:
@@ -341,6 +356,7 @@ def _main():
     parser_args_data = argparse.ArgumentParser(add_help=False)
     parser_args_data.add_argument('--data', type=str, default=None, help='file with metadata, used for grouping and filtering; in order to always use latest results file set it to LATEST') 
     parser_args_data.add_argument('--filters', type=str, default=None, nargs='+', metavar='FILTER', help='filters results based on the provided criteria in the form of VAR=A-B') 
+    parser_args_data.add_argument('--dir', type=str, default=None, help='directory where the results files are located')
 
     parser_run = subparsers.add_parser('run', aliases=['r'], parents=[parser_args_tests], help='runs a batch of tests')
     parser_run.set_defaults(mode='run')
@@ -352,10 +368,12 @@ def _main():
     
     parser_show = subparsers.add_parser('show', aliases=['s'], parents=[parser_args_tests, parser_args_data], help='shows current results', formatter_class=argparse.RawTextHelpFormatter)
     parser_show.set_defaults(mode='show')
-    parser_show.add_argument('--groups', type=str, default=None, nargs='+', metavar='GROUP', help='create additional columns for each group based on the provided criteria\nFormats allowed:\nVAR     - create a single group for each value of VAR\nVAR@N   - create N equal-sized based on VAR\nVar=A-B - create a single group where VAR is within A-B range') 
+    parser_show.add_argument('--groups', type=str, nargs='+', default=None, metavar='GROUP', help='create additional columns for each group based on the provided criteria\nFormats allowed:\nVAR     - create a single group for each value of VAR\nVAR@N   - create N equal-sized based on VAR\nVar=A-B - create a single group where VAR is within A-B range') 
     parser_show.add_argument('--var', type=str, default='score', help='name of the variable you want to visualize (instead of score)')
     parser_show.add_argument('--scoring', type=str, default=None, choices=['raw','min', 'max'], help='sets the scoring function used for calculating ranking')
     parser_show.add_argument('--sorting', type=str, default=None, choices=['name', 'date'], help='sets how the runs are sorted')
+    parser_show.add_argument('--files', type=str, nargs='+', default=None, help='list of regexp patterns for files to be included')
+    parser_show.add_argument('--xfiles', type=str, nargs='+', default=None, help='list of regexp patterns for files to be excluded')
     parser_show.add_argument('--scale', type=float, default=None, help='sets scaling of results') 
     parser_show.add_argument('--noscale', action='store_true', help='turns off the scaling; values will be a simple sum over all tests') 
     
@@ -373,11 +391,6 @@ def _main():
     config_mode_group.add_argument('--delete', type=str, metavar='TEMPLATE', help='permanently deletes stored template config')
     config_mode_group.add_argument('--list', action='store_true', help='lists available template configs')
     
-    # parser_generate = subparsers.add_parser('generate', aliases=['g'], help='')
-    # parser_generate.add_argument('--generate-scripts', action='store_true', help='generates scripts defined in the config file')
-    # parser_generate.add_argument('--ip', type=str, default=None, help='optional argument for --generate-scripts')
-    # parser_generate.add_argument('--source', type=str, default=None, help='optional argument for --generate-scripts')
-
     args = parser.parse_args()
     
     if args.mode == 'config':
@@ -447,45 +460,6 @@ def _main():
         return type(value)
         
     
-    # Mode: Generate Scripts (currently disable)
-    # if args.mode == 'generate':
-        # print('Generating Scripts')
-        # for script_name in cfg['scripts']:
-            # script = cfg.get('scripts', script_name, raw=True)
-            # undefined = []
-            
-            # if '%RUN_CMD%' in script:
-                # script = script.replace('%RUN_CMD%', cfg['general']['run_cmd'])
-                
-            # if '%EXEC%' in script:
-                # if not args.exec:
-                    # undefined.append('missing %ECEC% (use --exec EXEC)')
-                # else:
-                    # script = script.replace('%EXEC%', args.exec)
-                    
-            # if '%IP%' in script:
-                # if not args.ip:
-                    # undefined.append('missing %IP% (use --ip IP)')
-                # else:
-                    # script = script.replace('%IP%', args.ip)
-                    
-            # if '%SOURCE%' in script:
-                # if not args.source:
-                    # undefined.append('missing %SOURCE% (use --source SOURCE)')
-                # else:
-                    # script = script.replace('%SOURCE%', args.source)
-                    
-            # if undefined:
-                # print(f'Ignoring script {script_name} because of {undefined}')
-                # continue
-                
-            # with open(script_name, 'w') as f:
-                # for i, line in enumerate(script.split('\\n')):
-                    # prefix = f'{script_name} ='
-                    # print(prefix if i == 0 else ' ' * len(prefix), line)
-                    # print(line, file=f)
-        # sys.exit(0)
-    
     # Parse args.tests
     args.tests = try_str_to_numeric(args.tests or convert(cfg['default']['tests']))
     if args.tests is None:
@@ -515,7 +489,7 @@ def _main():
     if args.mode == 'find':
         args.data = args.data or cfg['default']['data']
         if args.data == 'LATEST':
-            results_files = find_res_files(cfg['general']['results_dir'])
+            results_files = find_res_files(args.dir or cfg['general']['results_dir'])
             _, args.data = sorted(zip([os.path.getmtime(result_file) for result_file in results_files], results_files))[-1]
         else:
             args.data += cfg['general']['results_ext']
@@ -547,7 +521,7 @@ def _main():
         args.scoring = args.scoring or convert(cfg['default']['scoring'])
         args.sorting = args.sorting or convert(cfg['default']['sorting'])
         
-        results_files = find_res_files(cfg['general']['results_dir'])
+        results_files = find_res_files(args.dir or cfg['general']['results_dir'], args.files, args.xfiles)
         if not results_files:
             fatal_error(f'There are no results files in the results folder: {cfg["general"]["results_dir"]}')
             
