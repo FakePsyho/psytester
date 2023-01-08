@@ -10,7 +10,7 @@
 # -mode show simple histogram for stats
 # -add simple automated unit tests (load config, run tests and check if output is as intended)
 # -rename github/pypi to psytester
-# -conver config to toml
+# -convert config to toml
 # -better handling of crashing / infiniteloop programs
 # -add crashes reporting (requires additional output from "cmd_play_game")
 

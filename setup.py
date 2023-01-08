@@ -1,5 +1,5 @@
 from setuptools import setup
-from psytester.tester import __version__
+__version__ = '0.5.1'
 
 setup(
     name = 'psytester',
