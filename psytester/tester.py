@@ -9,6 +9,10 @@
 # -fix double printing progress bug
 # -mode show simple histogram for stats
 # -add simple automated unit tests (load config, run tests and check if output is as intended)
+# -rename github/pypi to psytester
+# -conver config to toml
+# -better handling of crashing / infiniteloop programs
+# -add crashes reporting (requires additional output from "cmd_play_game")
 
 # LOW PRIORITY:
 # -add a future proof mechanism for missing lines in config files? (will happen if someones updates the tester but the config file will stay the same)
@@ -341,7 +345,7 @@ def _main():
     global args
     global cfg
     
-    parser = argparse.ArgumentParser(description='Local tester for Topcoder Marathons & AtCoder Heuristic Contests\nMore help available at https://github.com/FakePsyho/mmtester', formatter_class=argparse.RawTextHelpFormatter)
+    parser = argparse.ArgumentParser(description='Local tester for Topcoder Marathons & AtCoder Heuristic Contests\nMore help available at https://github.com/FakePsyho/psytester', formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('-c', '--config', type=str, default=DEFAULT_CONFIG_PATH, help='path to cfg file')
     subparsers = parser.add_subparsers(title='modes')
     
@@ -357,7 +361,7 @@ def _main():
     parser_run.set_defaults(mode='run')
     parser_run.add_argument('-m', '--threads_no', type=int, help='number of threads to use') 
     parser_run.add_argument('-p', '--progress', action='store_true', help='shows current progress when testing') 
-    parser_run.add_argument('-d', '--debug', action='store_true', help='special verbose mode helpful when figuring out why mmtester doesn\'t work; overrides threads_no to 1')
+    parser_run.add_argument('-d', '--debug', action='store_true', help='special verbose mode helpful when figuring out why psytester doesn\'t work; overrides threads_no to 1')
     parser_run.add_argument('-a', '--tester_arguments', type=str, default='', help='additional arguments for the tester')
     parser_run.add_argument('name', type=str, nargs='?', default=None, help='name of the run; if not specified the results will be printed to stdout') 
     
@@ -433,17 +437,17 @@ def _main():
             
         
     if not os.path.exists(args.config):
-        fatal_error([f"Missing config file {args.config}, either use correct config file with \"mmtester -c config_file\" or create a new one with \"mmtester config --load template\"",
-            "If you don't know how to use mmtester, please check out the github project readme at: https://github.com/FakePsyho/mmtester"])
+        fatal_error([f"Missing config file {args.config}, either use correct config file with \"psytester -c config_file\" or create a new one with \"psytester config --load template\"",
+            "If you don't know how to use psytester, please check out the github project readme at: https://github.com/FakePsyho/psytester"])
     
     cfg = configparser.ConfigParser(interpolation=None)
     cfg.read(args.config)
     
     if cfg['general']['version'] != __version__:
-        fatal_error([f"{args.config} version ({cfg['general']['version']}) doesn't match the current version of mmtester {__version__}",
-            "Unfortunately mmtester is currently not backwards compatible with old config files",
-            "The recommended way to resolve this problem is to manually update your config file with changes introduced in the new version (create a new config file with \"mmtester config --load template\")",
-            "Alternatively, you can downgrade your version of mmtester to match the config file"])
+        fatal_error([f"{args.config} version ({cfg['general']['version']}) doesn't match the current version of psytester {__version__}",
+            "Unfortunately psytester is currently not backwards compatible with old config files",
+            "The recommended way to resolve this problem is to manually update your config file with changes introduced in the new version (create a new config file with \"psytester config --load template\")",
+            "Alternatively, you can downgrade your version of psytester to match the config file"])
     
     # XXX: probably there's a better way to do this
     def convert(value, type=str):
@@ -560,7 +564,7 @@ def _main():
             if (s.startswith('extraction_regex_')):
                 patterns.append(cfg['general'][s])
         if not patterns:
-            fatal_error('No extraction patterns specified (introduced in mmtester 0.5.0) - check online documentation')
+            fatal_error('No extraction patterns specified (introduced in psytester 0.5.0) - check online documentation')
         if args.debug:
             print('Extraction patterns found:')
             for pattern in patterns:

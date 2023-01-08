@@ -1,4 +1,5 @@
 [0.5.1]
+* mmtester renamed to psytester
 * run: --debug mode added
 * show: new general/leaderboard replaces general/show_XXX options and allows for custom leaderboard order
 * show: new options for including/excluding specific results files, use --files LIST OF FILES / --xfiles LIST OF FILES respectively; you can use both at the same time

@@ -1,15 +1,15 @@
 from setuptools import setup
-from mmtester.tester import __version__
+from psytester.tester import __version__
 
 setup(
-    name = 'mmtester',
-    packages = ['mmtester'],
-    package_data = {'mmtester': ['topcoder.cfg', 'old_topcoder.cfg', 'atcoder.cfg']},
+    name = 'psytester',
+    packages = ['psytester'],
+    package_data = {'psytester': ['topcoder.cfg', 'old_topcoder.cfg', 'atcoder.cfg']},
     version = __version__,
     license = 'MIT',
     description = "Local tester for Topcoder Marathons & AtCoder Heuristic Contests",
     author = 'Psyho',
-    url = 'https://github.com/FakePsyho/mmtester',
+    url = 'https://github.com/FakePsyho/psytester',
     keywords = ['Topcoder', 'Marathon', 'AtCoder', 'Tester'],
     install_requires=['tabulate'],
     classifiers = [
@@ -21,5 +21,5 @@ setup(
         'Operating System :: OS Independent',
         'Programming Language :: Python :: 3',
     ],
-    entry_points = {'console_scripts': ['mmtester = mmtester.tester:_main']},
+    entry_points = {'console_scripts': ['psytester = psytester.tester:_main']},
 )
