@@ -88,78 +88,85 @@ def fatal_error(msgs, exit_main=False):
 
 
 def run_test(test) -> Dict:
+    retries_left = args.retry
 
-    seed = test['seed']
+    while True: 
 
-    run_dir = args.name or '_default'
-    
-    output_dir = cfg["general"]["tests_dir"] + (f'/{run_dir}' if cfg["general"]["merge_output_dirs"].lower() == "false" else '')
-    if args.debug:
-        print()
-        print('Running test:', test)
-        print('Working directory:', output_dir)
-    
-    os.makedirs(output_dir, exist_ok=True)
-    
-    def parse_cmd(s):
-        s = s.replace('%SEED%', str(seed))
-        for i in range(1, 10):
-            s = s.replace(f'%SEED0{i}%', f'{seed:0{i}}')
-        s = s.replace('%OUTPUT_DIR%', output_dir)
-        s = s.replace('%TESTER_ARGS%', args.tester_arguments)
-        return s
-    
-    cmd = parse_cmd(cfg['general']['cmd_tester'])
-    output_files = [parse_cmd(s) for s in cfg['general']['output_files'].split(',')]
-    if args.debug:
-        print('general/cmd_tester')
-        print('Original:', cfg["general"]["cmd_tester"])
-        print('Parsed:', cmd)
-        print('general/output_files')
-        print('Original:', cfg['general']['output_files'])
-        print('Parsed:', output_files)
-        print()
-        print('Executing cmd_tester')
-       
-    
-    start_time = time.time()
-    completed_run = subprocess.run(cmd, shell=True)
-    rv = {'id': seed}
-    
-    if args.debug:
-        print(f'cmd_tester finished with {completed_run.returncode} return code after {round(time.time() - start_time, 6)} seconds')
-        print()
-        print('Contents of the output files:')
-            
-    
-    for output_file in output_files:
-        if args.debug:
-            print(f'File: {output_file}')
-            if not os.path.exists(output_file):
-                fatal_error(f'Output file {output_file} doesn\'t exist; this means either cmd_tester/output_files is incorrectly defined or your tester/solver crashed and didn\'t produce that file', True)
-        with open(output_file) as f:
-            for line in f:
-                for pattern in patterns:
-                    m = re.match(pattern, line)
-                    if m: 
-                        if args.debug:
-                            print(f'!!! Successful match with {pattern} pattern')
-                        m = m.groupdict()
-                        if 'VARIABLE' in m and 'VALUE' in m:
-                            m[m['VARIABLE']] = m['VALUE']
-                            del m['VARIABLE']
-                            del m['VALUE']
-                        rv.update({k: try_str_to_numeric(v) for k, v in m.items()})
-                        if args.debug:
-                            print('!!! Extracted dict:', m, 'New dict:', rv)
-                    
-        if cfg['general']['keep_output_files'].lower() != 'true':
-            os.remove(output_file)
-                
-    if 'score' not in rv:
-        print(f'\r[Error] Seed: {seed} cointains no score')
+        seed = test['seed']
+
+        run_dir = args.name or '_default'
         
-    return rv
+        output_dir = cfg["general"]["tests_dir"] + (f'/{run_dir}' if cfg["general"]["merge_output_dirs"].lower() == "false" else '')
+        if args.debug:
+            print()
+            print('Running test:', test)
+            print('Working directory:', output_dir)
+        
+        os.makedirs(output_dir, exist_ok=True)
+        
+        def parse_cmd(s):
+            s = s.replace('%SEED%', str(seed))
+            for i in range(1, 10):
+                s = s.replace(f'%SEED0{i}%', f'{seed:0{i}}')
+            s = s.replace('%OUTPUT_DIR%', output_dir)
+            s = s.replace('%TESTER_ARGS%', args.tester_arguments)
+            return s
+        
+        cmd = parse_cmd(cfg['general']['cmd_tester'])
+        output_files = [parse_cmd(s) for s in cfg['general']['output_files'].split(',')]
+        if args.debug:
+            print('general/cmd_tester')
+            print('Original:', cfg["general"]["cmd_tester"])
+            print('Parsed:', cmd)
+            print('general/output_files')
+            print('Original:', cfg['general']['output_files'])
+            print('Parsed:', output_files)
+            print()
+            print('Executing cmd_tester')
+        
+        
+        start_time = time.time()
+        completed_run = subprocess.run(cmd, shell=True)
+        rv = {'id': seed}
+        
+        if args.debug:
+            print(f'cmd_tester finished with {completed_run.returncode} return code after {round(time.time() - start_time, 6)} seconds')
+            print()
+            print('Contents of the output files:')
+                
+        
+        for output_file in output_files:
+            if args.debug:
+                print(f'File: {output_file}')
+                if not os.path.exists(output_file):
+                    fatal_error(f'Output file {output_file} doesn\'t exist; this means either cmd_tester/output_files is incorrectly defined or your tester/solver crashed and didn\'t produce that file', True)
+            with open(output_file) as f:
+                for line in f:
+                    for pattern in patterns:
+                        m = re.match(pattern, line)
+                        if m: 
+                            if args.debug:
+                                print(f'!!! Successful match with {pattern} pattern')
+                            m = m.groupdict()
+                            if 'VARIABLE' in m and 'VALUE' in m:
+                                m[m['VARIABLE']] = m['VALUE']
+                                del m['VARIABLE']
+                                del m['VALUE']
+                            rv.update({k: try_str_to_numeric(v) for k, v in m.items()})
+                            if args.debug:
+                                print('!!! Extracted dict:', m, 'New dict:', rv)
+                        
+            if cfg['general']['keep_output_files'].lower() != 'true':
+                os.remove(output_file)
+                    
+        if 'score' not in rv:
+            if retries_left:
+                retries_left -= 1
+                print(f'\r[Warning] Seed: {seed} cointains no score, retrying ({retries_left} retries left)')
+                continue
+            print(f'\r[Error] Seed: {seed} cointains no score')
+            
+        return rv
     
     
 def find_res_files(dir='.', include_patterns=None, exclude_patterns=None):
@@ -363,6 +370,7 @@ def _main():
     parser_run.add_argument('-p', '--progress', action='store_true', help='shows current progress when testing') 
     parser_run.add_argument('-d', '--debug', action='store_true', help='special verbose mode helpful when figuring out why psytester doesn\'t work; overrides threads_no to 1')
     parser_run.add_argument('-a', '--tester_arguments', type=str, default='', help='additional arguments for the tester')
+    parser_run.add_argument('-r', '--retry', type=int, default=0, help='number of retries when a test fails')
     parser_run.add_argument('name', type=str, nargs='?', default=None, help='name of the run; if not specified the results will be printed to stdout') 
     
     parser_show = subparsers.add_parser('show', aliases=['s'], parents=[parser_args_tests, parser_args_data], help='shows current results', formatter_class=argparse.RawTextHelpFormatter)

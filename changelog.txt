@@ -1,3 +1,5 @@
+[WIP]
+* run: new option --retry N that reruns each test up to N times in case it produced no score (useful when tester doesn't always flush its output)
 [0.5.1]
 * mmtester renamed to psytester
 * run: --debug mode added
