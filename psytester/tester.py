@@ -205,10 +205,10 @@ def process_raw_scores(scores: List[float], scoring: str) -> List[float]:
     if scoring=='raw':
         return scores
     if scoring=='min':
-        best_score = min([math.inf] + [score for score in scores if score >= 0])
-        return [best_score / score if score >= 0 else 0 for score in scores]
+        best_score = min([math.inf] + [score for score in scores if score > 0])
+        return [best_score / score if score > 0 else 0 for score in scores]
     if scoring=='max':
-        best_score = max([0] + [score for score in scores if score >= 0])
+        best_score = max([0] + [score for score in scores if score > 0])
         return [score / best_score if score > 0 else 0 for score in scores]
     
     fatal_error(f'Unknown scoring function: {scoring}')
