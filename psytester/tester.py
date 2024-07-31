@@ -46,7 +46,7 @@ import time
 import configparser
 import shutil
 import traceback
-import _thread
+import colorama
 from typing import List, Dict, Union
 import queue
 from threading import Thread
@@ -354,6 +354,7 @@ def _main():
     
     parser = argparse.ArgumentParser(description='Local tester for Topcoder Marathons & AtCoder Heuristic Contests\nMore help available at https://github.com/FakePsyho/psytester', formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('-c', '--config', type=str, default=DEFAULT_CONFIG_PATH, help='path to cfg file')
+    parser.set_defaults(mode=None)
     subparsers = parser.add_subparsers(title='modes')
     
     parser_args_tests = argparse.ArgumentParser(add_help=False)
@@ -399,6 +400,9 @@ def _main():
     config_mode_group.add_argument('--list', action='store_true', help='lists available template configs')
     
     args = parser.parse_args()
+
+    if args.mode is None:
+        fatal_error('No mode specified, type "psytester -h" for help')
     
     if args.mode == 'config':
         if args.load:

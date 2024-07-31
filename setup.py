@@ -10,8 +10,8 @@ setup(
     description = "Local tester for Topcoder Marathons & AtCoder Heuristic Contests",
     author = 'Psyho',
     url = 'https://github.com/FakePsyho/psytester',
-    keywords = ['Topcoder', 'Marathon', 'AtCoder', 'Tester'],
-    install_requires=['tabulate'],
+    keywords = ['Topcoder', 'Marathon', 'AtCoder', 'Competitive Programming', 'Tester'],
+    install_requires=['tabulate', 'colorama'],
     classifiers = [
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Developers',
