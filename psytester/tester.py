@@ -6,30 +6,33 @@
 #TODO:
 # HIGH PRIORITY:
 # -create proper ReadMe
-# -fix double printing progress bug
+# -fix double printing progress bug (get rid off \r?)
 # -mode show simple histogram for stats
 # -add simple automated unit tests (load config, run tests and check if output is as intended)
 # -rename github/pypi to psytester
 # -convert config to toml
 # -better handling of crashing / infiniteloop programs
 # -add crashes reporting (requires additional output from "cmd_play_game")
+# -code is a bit messy now, refactor modes into functions
+# -boostrapping to show % that particular solution is the best one (it's going to be very slow in python :())
+# -change config file to toml
 
 # LOW PRIORITY:
 # -add a future proof mechanism for missing lines in config files? (will happen if someones updates the tester but the config file will stay the same)
-# -add option to shorten group names?
+# -add option to shorten group names (i.e. aliases)?
 # -add support for custom scoring (cfg would be python code?)
-# -add RUNNER parameters (like for hash code) (Moved to RUNNER?)
-# -sync with RUNNER? (how?)
+# -sync with RUNNER? (probably to make RUNNER highly configurable instead)
 # -add cleanup on ctrl+c (what that would be?)
 # -simplify parameters in config (some parameters are redundant)
 
 # ???:
-# -show: add transpose?
+# -show: add transpose (would be useful if someone wants to group by seed)?
 # -is it possible to monitor cpu% and issue warning (too many threads); useful for running on cloud with tons of threads
 # -add html export option for --show?
 # -add comments to code (explaining functions should be enough)
 # -add more annotations to functions
 # -add ML model to figure out best parameters for test type? (this would require embedding prediction model in C++ code, simple MLP model? how to avoid overfitting?)
+
 
 __version__ = '0.5.1'
 
@@ -85,6 +88,16 @@ def fatal_error(msgs, exit_main=False):
         os._exit(1)
     else:
         sys.exit(1)
+
+
+def parse_color(color):
+    color = color.upper()
+    style = colorama.Style.NORMAL
+    if '_' in color:
+        style, color = color.split('_')
+        style = getattr(colorama.Style, style)
+    color = getattr(colorama.Fore, color) if color not in ['DEFAULT', '*'] else ''
+    return style + color    
 
 
 def run_test(test) -> Dict:
@@ -239,13 +252,33 @@ def show_summary(runs: Dict[str, Dict[int, float]], tests: Union[None, List[int]
 
     if not data and (filters or groups):
         fatal_error('Filters/Groups used but no data file is provided')
-        
+
     if filters:
         initial_tests_no = len(tests)
         for filter in filters:
             tests = apply_filter(tests, data, filter)
         print(f'Filtered {initial_tests_no} tests to {len(tests)}')
             
+    # init color commands
+    even_row_cmd = ''
+    odd_row_cmd = ''
+    header_cmd = ''
+    group_max_cmd = ''
+    reset_cmd = ''
+    if cfg['general']['show_colors'].lower() == 'true':
+        try:
+            colorama.init()
+            even_row_cmd = parse_color(cfg['general']['even_row_color'])
+            odd_row_cmd  = parse_color(cfg['general']['odd_row_color'])
+            header_cmd = parse_color(cfg['general']['header_color'])
+            group_max_cmd = parse_color(cfg['general']['group_max_color'])
+            reset_cmd = colorama.Style.RESET_ALL
+        except AttributeError:
+            traceback.print_exc()
+            fatal_error('One of the specified colors is not valid. Refer to the cfg file for valid combinations')
+
+
+    # create groups
     group_names = ['Overall']
     group_tests = [tests]
     
@@ -284,9 +317,13 @@ def show_summary(runs: Dict[str, Dict[int, float]], tests: Union[None, List[int]
                     group_names.append(f'{var}={value}')
                     group_tests.append(apply_filter(tests, data, f'{var}={value}'))
                     
+
+    # generate data for each column
     columns = {}
     columns['runs'] = [('Tests\nRun', [run_name for run_name in runs])]
     columns['groups'] = []
+
+    precision = int(cfg["general"]["precision"])
         
     total_fails = {run_name: 0 for run_name in runs}
     total_bests = {run_name: 0 for run_name in runs}
@@ -310,7 +347,14 @@ def show_summary(runs: Dict[str, Dict[int, float]], tests: Union[None, List[int]
                     total_fails[run_name] += 1 if score <= 0 else 0
                     total_missing[run_name] += 0 if args.var in runs[run_name][test] else 1
                     
-        column = (f'{len(group_test)}\n{group_name}', [total_scores[run_name] * group_scale for run_name in runs])
+        column = (f'{len(group_test)}\n{group_name}', [round(total_scores[run_name] * group_scale, precision) for run_name in runs])
+
+        # highlight the best score in the group
+        best_score = max(total_scores.values())
+        for i, score in enumerate(total_scores.items()):
+            if score[1] == best_score:
+                column[1][i] = group_max_cmd + str(column[1][i]) + reset_cmd + (even_row_cmd if i % 2 else odd_row_cmd)
+
         if group_no == 0:
             columns['overall'] = [column]
         else:
@@ -321,7 +365,7 @@ def show_summary(runs: Dict[str, Dict[int, float]], tests: Union[None, List[int]
      
     columns['bests'] = [('\nBests', [total_bests[run_name] for run_name in runs])]
     columns['uniques'] = [('\nUniques', [total_uniques[run_name] for run_name in runs])]
-    columns['gain'] = [('\nGain', [total_gain[run_name] for run_name in runs])]
+    columns['gain'] = [('\nGain', [round(total_gain[run_name], precision) for run_name in runs])]
     columns['fails'] = [('\nFails', [total_fails[run_name] for run_name in runs])]
     columns['missing'] = [('\nMissing', [total_missing[run_name] for run_name in runs])]
     
@@ -344,8 +388,23 @@ def show_summary(runs: Dict[str, Dict[int, float]], tests: Union[None, List[int]
                 
     table = list(zip(*table))
     if hasattr(tabulate, 'MIN_PADDING'):
-        tabulate.MIN_PADDING = 0
-    print(tabulate.tabulate(table, headers=headers, floatfmt=f'.{cfg["general"]["precision"]}f'))
+        tabulate.MIN_PADDING = 0    
+
+    # generate ascii table and output it using colors
+    output = tabulate.tabulate(table, headers=headers)
+    parity = False
+    header = True
+    for line in output.splitlines():
+        if header:
+            if line.startswith('-'):
+                header = False
+            else:
+                line = header_cmd + line + reset_cmd
+        else:
+            line = (even_row_cmd if parity else odd_row_cmd) + line + reset_cmd
+            parity = not parity
+        print(line)
+    print(reset_cmd, end='')
         
 
 def _main():
