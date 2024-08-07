@@ -246,7 +246,7 @@ def show_summary(runs: Dict[str, Dict[int, float]], tests: Union[None, List[int]
     else:
         # TODO: error check if tests are cointained in intersection of all results files?
         pass
-        
+
     if not tests:
         fatal_error('There are no common tests within the results files (maybe one of the results files is empty?)')
 
@@ -331,7 +331,7 @@ def show_summary(runs: Dict[str, Dict[int, float]], tests: Union[None, List[int]
     total_gain = {run_name: 0 for run_name in runs}
     total_missing = {run_name: 0 for run_name in runs}
     for group_no, (group_name, group_test) in enumerate(zip(group_names, group_tests)):
-        total_scores = {run_name: 0.0 for run_name in runs}
+        total_scores = {run_name: 0 for run_name in runs}
         group_scale = args.scale / max(1, len(group_test)) if args.scale else 1.0
         for test in group_test:
             scores = process_raw_scores([run_results[test].get(args.var, 0) for run_results in runs.values()], args.scoring)
@@ -347,7 +347,7 @@ def show_summary(runs: Dict[str, Dict[int, float]], tests: Union[None, List[int]
                     total_fails[run_name] += 1 if score <= 0 else 0
                     total_missing[run_name] += 0 if args.var in runs[run_name][test] else 1
                     
-        column = (f'{len(group_test)}\n{group_name}', [round(total_scores[run_name] * group_scale, precision) for run_name in runs])
+        column = (f'{len(group_test)}\n{group_name}', [round(total_scores[run_name] * group_scale, precision if precision else None) for run_name in runs])
 
         # highlight the best score in the group
         best_score = max(total_scores.values())
@@ -359,13 +359,13 @@ def show_summary(runs: Dict[str, Dict[int, float]], tests: Union[None, List[int]
             columns['overall'] = [column]
         else:
             columns['groups'].append(column)
-            
+
     if all([v > 0 for v in total_missing.values()]):
         fatal_error(f'None of the results files contain "{args.var}" variable')
      
     columns['bests'] = [('\nBests', [total_bests[run_name] for run_name in runs])]
     columns['uniques'] = [('\nUniques', [total_uniques[run_name] for run_name in runs])]
-    columns['gain'] = [('\nGain', [round(total_gain[run_name], precision) for run_name in runs])]
+    columns['gain'] = [('\nGain', [round(total_gain[run_name], precision if precision else None) for run_name in runs])]
     columns['fails'] = [('\nFails', [total_fails[run_name] for run_name in runs])]
     columns['missing'] = [('\nMissing', [total_missing[run_name] for run_name in runs])]
     
