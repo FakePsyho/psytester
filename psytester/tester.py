@@ -346,6 +346,7 @@ def show_summary(runs: Dict[str, Dict[int, float]], tests: Union[None, List[int]
                     total_gain[run_name] += max(0, score - second_best_score) * group_scale
                     total_fails[run_name] += 1 if score <= 0 else 0
                     total_missing[run_name] += 0 if args.var in runs[run_name][test] else 1
+
                     
         column = (f'{len(group_test)}\n{group_name}', [round(total_scores[run_name] * group_scale, precision if precision else None) for run_name in runs])
 
@@ -359,9 +360,6 @@ def show_summary(runs: Dict[str, Dict[int, float]], tests: Union[None, List[int]
             columns['overall'] = [column]
         else:
             columns['groups'].append(column)
-
-    if all([v > 0 for v in total_missing.values()]):
-        fatal_error(f'None of the results files contain "{args.var}" variable')
      
     columns['bests'] = [('\nBests', [total_bests[run_name] for run_name in runs])]
     columns['uniques'] = [('\nUniques', [total_uniques[run_name] for run_name in runs])]
@@ -369,12 +367,22 @@ def show_summary(runs: Dict[str, Dict[int, float]], tests: Union[None, List[int]
     columns['fails'] = [('\nFails', [total_fails[run_name] for run_name in runs])]
     columns['missing'] = [('\nMissing', [total_missing[run_name] for run_name in runs])]
     
+    if all([v > 0 for v in total_missing.values()]):
+        fatal_error(f'None of the results files contain "{args.var}" variable')
+
+    # TODO: maybe generate them only when required (might slow down show command)
+    # TODO: change method so that lack of variable is empty string
+    # generate var columns
+    all_vars = set().union(*[set(runs[run_name][test].keys()) for run_name in runs for test in tests])
+    for var in all_vars:
+        columns[f'var:{var}'] = [(f'\n{var}', [round(sum([run_results[test].get(var, 0) for test in tests]) / len(tests), precision if precision else None) for run_results in runs.values()])]
+
     leaderboard = cfg['general']['leaderboard_score'] if args.var == 'score' else cfg['general']['leaderboard_custom']
     leaderboard = 'runs,' + leaderboard
     headers = []
     table = []
     for column_name in leaderboard.split(','):
-        column_name = column_name.lower()
+        column_name = column_name.lower() if not column_name.lower().startswith('var:') else 'var:' + column_name[4:]
         optional = False
         if column_name[-1] == '?':
             optional = True
