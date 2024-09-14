@@ -37,6 +37,7 @@
 __version__ = '0.5.1'
 
 import tabulate
+import numbers
 import re
 import math
 import sys
@@ -53,6 +54,8 @@ import colorama
 from typing import List, Dict, Union
 import queue
 from threading import Thread
+
+global_time = time.time()
 
 args = None
 cfg = None
@@ -318,13 +321,18 @@ def show_summary(runs: Dict[str, Dict[int, float]], tests: Union[None, List[int]
                     group_tests.append(apply_filter(tests, data, f'{var}={value}'))
                     
 
+    print('Before data', f'Time: {time.time() - global_time : .3f}')
     # generate data for each column
     columns = {}
     columns['runs'] = [('Tests\nRun', [run_name for run_name in runs])]
     columns['groups'] = []
 
+    max_cells = []
+
     precision = int(cfg["general"]["precision"])
         
+    # TODO: speed up (find the bottleneck, maybe try numpy?)
+
     total_fails = {run_name: 0 for run_name in runs}
     total_bests = {run_name: 0 for run_name in runs}
     total_uniques = {run_name: 0 for run_name in runs}
@@ -348,13 +356,14 @@ def show_summary(runs: Dict[str, Dict[int, float]], tests: Union[None, List[int]
                     total_missing[run_name] += 0 if args.var in runs[run_name][test] else 1
 
                     
-        column = (f'{len(group_test)}\n{group_name}', [round(total_scores[run_name] * group_scale, precision if precision else None) for run_name in runs])
+        column = (f'{len(group_test)}\n{group_name}', [total_scores[run_name] * group_scale for run_name in runs])
 
-        # highlight the best score in the group
+        # mark the position of the best score in the group
         best_score = max(total_scores.values())
         for i, score in enumerate(total_scores.items()):
             if score[1] == best_score:
-                column[1][i] = group_max_cmd + str(column[1][i]) + reset_cmd + (even_row_cmd if i % 2 else odd_row_cmd)
+                max_cells.append((column[0], i))
+                # column[1][i] = group_max_cmd + str(column[1][i]) + reset_cmd + (even_row_cmd if i % 2 else odd_row_cmd)
 
         if group_no == 0:
             columns['overall'] = [column]
@@ -363,36 +372,56 @@ def show_summary(runs: Dict[str, Dict[int, float]], tests: Union[None, List[int]
      
     columns['bests'] = [('\nBests', [total_bests[run_name] for run_name in runs])]
     columns['uniques'] = [('\nUniques', [total_uniques[run_name] for run_name in runs])]
-    columns['gain'] = [('\nGain', [round(total_gain[run_name], precision if precision else None) for run_name in runs])]
+    columns['gain'] = [('\nGain', [total_gain[run_name] for run_name in runs])]
     columns['fails'] = [('\nFails', [total_fails[run_name] for run_name in runs])]
     columns['missing'] = [('\nMissing', [total_missing[run_name] for run_name in runs])]
     
     if all([v > 0 for v in total_missing.values()]):
         fatal_error(f'None of the results files contain "{args.var}" variable')
 
-    # TODO: maybe generate them only when required (might slow down show command)
-    # TODO: change method so that lack of variable is empty string
-    # generate var columns
-    all_vars = set().union(*[set(runs[run_name][test].keys()) for run_name in runs for test in tests])
-    for var in all_vars:
-        columns[f'var:{var}'] = [(f'\n{var}', [round(sum([run_results[test].get(var, 0) for test in tests]) / len(tests), precision if precision else None) for run_results in runs.values()])]
-
     leaderboard = cfg['general']['leaderboard_score'] if args.var == 'score' else cfg['general']['leaderboard_custom']
     leaderboard = 'runs,' + leaderboard
     headers = []
     table = []
+
+    # TODO: show error if it's not avg,max,min,sum?
+    # TODO: add an ability to add alias with = so the final format would FUN:VAR.X=ALIAS
+    # TODO: rewrite this part since it's a complete mess
+
+    # generate var columns
+    all_vars = [(column_name[:3].lower(), column_name[4:].split('.')[0]) for column_name in leaderboard.split(',') if column_name.lower()[:4] in ['avg:','min:','max:','sum:']]
+    for fun, var in all_vars:
+        column = []
+        for run_results in runs.values():
+            if not any([var in run_results[test] for test in tests]):
+                column.append(None)
+                continue
+            data = [run_results[test][var] for test in tests if var in run_results[test]]
+            fun_mapping = {'sum': sum, 'min': min, 'max': max, 'avg': lambda arr: sum(arr) / len(tests)}
+            column.append(fun_mapping[fun](data))
+        columns[f'{fun}:{var}'] = [(f'\n{var}', column)]
+
     for column_name in leaderboard.split(','):
         column_name = column_name.lower() if not column_name.lower().startswith('var:') else 'var:' + column_name[4:]
         optional = False
+        column_precision = precision
         if column_name[-1] == '?':
             optional = True
             column_name = column_name[:-1]
+        if column_name[-2] == '.' and column_name[-1].isdigit():
+            column_precision = int(column_name[-1])
+            column_name = column_name[:-2]
         if column_name not in columns:
             fatal_error(f'Unknown column name: {column_name}, please correct the leaderboard_XXX option')
         for column in columns[column_name]:
             if not optional or any(column[1]):
+                data = column[1]
+                data = [round(value, column_precision if column_precision > 0 else None) if value is not None and isinstance(value, numbers.Number) else value for value in data]
+                for col_header, row in max_cells:
+                    if col_header == column[0]:
+                        data[row] = group_max_cmd + str(data[row]) + reset_cmd + (even_row_cmd if row % 2 else odd_row_cmd)
                 headers.append(column[0])
-                table += [column[1]]
+                table += [data]
                 
     table = list(zip(*table))
     if hasattr(tabulate, 'MIN_PADDING'):
@@ -413,7 +442,7 @@ def show_summary(runs: Dict[str, Dict[int, float]], tests: Union[None, List[int]
             parity = not parity
         print(line)
     print(reset_cmd, end='')
-        
+
 
 def _main():
     global args
