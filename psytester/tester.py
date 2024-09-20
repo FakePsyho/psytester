@@ -34,7 +34,7 @@
 # -add ML model to figure out best parameters for test type? (this would require embedding prediction model in C++ code, simple MLP model? how to avoid overfitting?)
 
 
-__version__ = '0.5.1'
+__version__ = '0.5.2'
 
 import tabulate
 import numbers
@@ -320,8 +320,6 @@ def show_summary(runs: Dict[str, Dict[int, float]], tests: Union[None, List[int]
                     group_names.append(f'{var}={value}')
                     group_tests.append(apply_filter(tests, data, f'{var}={value}'))
                     
-
-    print('Before data', f'Time: {time.time() - global_time : .3f}')
     # generate data for each column
     columns = {}
     columns['runs'] = [('Tests\nRun', [run_name for run_name in runs])]

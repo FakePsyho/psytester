@@ -1,6 +1,8 @@
-[WIP]
-* show: experimental support for colors (zebra pattern for the table + highlight on the best score for each group)
+[0.5.2]
 * run: new option --retry N that reruns each test up to N times in case it produced no score (useful when tester doesn't always flush its output)
+* show: experimental support for colors (zebra pattern for the table + highlight on the best score for each group)
+* show: you can show avg/sum/min/max of any custom variable; more info about that in the config files
+* show: you can override precision for each column
 [0.5.1]
 * mmtester renamed to psytester
 * run: --debug mode added
@@ -11,14 +13,14 @@
 * complete overhaul of cmd line help
 	* --help will only show the explanation for arguments relevant to your mode (e.g. run, show, find)
 	* help descriptions should be more clear now
-	* some of the commands are invoked differently, most notable run is now "mmtester r ..." instead of "mmtester ..."
+	* some of the commands are invoked differently, most notable run is now "psytester r ..." instead of "psytester ..."
 * run: patterns for extracting the score / metadata are converted to regex and are editable in the config files
 * show: new option --var VARIABLE in order to show stats for VARIABLE instead of score
 * show: --noscale override to remove scaling from cmd line
-* run: removed support for AHC generator; running generator single time manually is always going to be easier than configuring it to work with mmtester
+* run: removed support for AHC generator; running generator single time manually is always going to be easier than configuring it to work with psytester
 * show: additional "Missing" column for tests missing score (or a specified variable)
 * find: you can use --tests as a filter 
-* run: removed --benchmark as it was a cumbersome option and was inferior to just running "mmtester show" during the run
+* run: removed --benchmark as it was a cumbersome option and was inferior to just running "psytester show" during the run
 * tester.py functions as a stand-alone script (if you need changes, you can create local copy of tester.py run it from current directory)
 [0.4.1]
 * separate predefined configs for topcoder/atcoder
@@ -33,7 +35,7 @@
 * show: # of bests/uniques/gain for each run (enabled/disabled in config)
 * show: option for autohiding fails when there are no failed testcases
 [0.2.1]
-* versioning support (config files store the version of mmtester)
+* versioning support (config files store the version of psytester)
 * --groups: added VAR@N to automatically create N equally-sized bins for VAR variable
 * show: prints number of tests for each group at the top
 * general/merge_output_dirs config option to reduce the number of output files
