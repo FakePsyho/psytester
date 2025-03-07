@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
 # Author: Psyho
-# Twitter: https://twitter.com/fakepsyho
+# Twitter: twitter.com/fakepsyho
+# BlueSky: psyho.bsky.social
 
 #TODO:
 # HIGH PRIORITY:
@@ -439,7 +440,6 @@ def show_summary(runs: Dict[str, Dict[int, float]], tests: Union[None, List[int]
             line = (even_row_cmd if parity else odd_row_cmd) + line + reset_cmd
             parity = not parity
         print(line)
-    print(reset_cmd, end='')
 
 
 def _main():
