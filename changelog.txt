@@ -1,7 +1,7 @@
 [0.5.2]
 * run: new option --retry N that reruns each test up to N times in case it produced no score (useful when tester doesn't always flush its output)
 * show: experimental support for colors (zebra pattern for the table + highlight on the best score for each group)
-* show: you can show avg/sum/min/max of any custom variable; more info about that in the config files
+* show: you can show min/max/sum/avg/gavg of any custom variable; more info about that in the config files
 * show: you can override precision for each column
 [0.5.1]
 * mmtester renamed to psytester

@@ -388,7 +388,7 @@ def show_summary(runs: Dict[str, Dict[int, float]], tests: Union[None, List[int]
     # TODO: rewrite this part since it's a complete mess
 
     # generate var columns
-    all_vars = [(column_name[:3].lower(), column_name[4:].split('.')[0]) for column_name in leaderboard.split(',') if column_name.lower()[:4] in ['avg:','min:','max:','sum:']]
+    all_vars = [(column_name.split(':')[0].lower(), column_name.split(':')[1].split('.')[0]) for column_name in leaderboard.split(',') if ':' in column_name and column_name.split(':')[0].lower() in ['avg','min','max','sum','gavg']]
     for fun, var in all_vars:
         column = []
         for run_results in runs.values():
@@ -396,8 +396,17 @@ def show_summary(runs: Dict[str, Dict[int, float]], tests: Union[None, List[int]
                 column.append(None)
                 continue
             data = [run_results[test][var] for test in tests if var in run_results[test]]
-            fun_mapping = {'sum': sum, 'min': min, 'max': max, 'avg': lambda arr: sum(arr) / len(tests)}
-            column.append(fun_mapping[fun](data))
+            data = [value for value in data if value is not None]
+            if fun == 'gavg':
+                data = [x for x in data if x > 0]
+            fun_mapping = {
+                'sum': sum,
+                'min': min,
+                'max': max,
+                'avg': lambda a: sum(a) / len(tests),
+                'gavg': lambda a: math.exp(sum(math.log(x) for x in a) / len(a))
+            }
+            column.append(fun_mapping[fun](data) if data else '')
         columns[f'{fun}:{var}'] = [(f'\n{var}', column)]
 
     for column_name in leaderboard.split(','):
